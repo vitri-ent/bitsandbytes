@@ -238,7 +238,7 @@ def determine_cuda_runtime_lib_path() -> Union[Path, None]:
     candidate_env_vars = get_potentially_lib_path_containing_env_vars()
 
     if "CONDA_PREFIX" in candidate_env_vars:
-        conda_libs_path = Path(candidate_env_vars["CONDA_PREFIX"]) / "lib"
+        conda_libs_path = Path(candidate_env_vars["CONDA_PREFIX"]) / "bin"
 
         conda_cuda_libs = find_cuda_lib_in(str(conda_libs_path))
         warn_in_case_of_duplicates(conda_cuda_libs)
