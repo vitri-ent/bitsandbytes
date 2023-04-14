@@ -12,6 +12,7 @@ import bitsandbytes as bnb
 import bitsandbytes.functional
 from bitsandbytes.autograd._functions import get_inverse_transform_indices, undo_layout
 from bitsandbytes.optim import GlobalOptimManager
+from bitsandbytes.utils import OutlierTracer, find_outlier_dims
 
 T = TypeVar("T", bound="torch.nn.Module")
 
@@ -134,6 +135,34 @@ class Embedding(torch.nn.Embedding):
         )
 
         return emb
+
+class OutlierAwareLinear(nn.Linear):
+    def __init__(self, input_features, output_features, bias=True):
+        super().__init__(input_features, output_features, bias)
+        self.outlier_dim = None
+        self.is_quantized = False
+
+    def forward_with_outliers(self, x, outlier_idx):
+        raise NotImplementedError('Please override the `forward_with_outliers(self, x, outlier_idx)` function')
+
+    def quantize_weight(self, w, outlier_idx):
+        raise NotImplementedError('Please override the `quantize_weights(self, w, outlier_idx)` function')
+
+    def forward(self, x):
+        if self.outlier_dim is None:
+            tracer = OutlierTracer.get_instance()
+            if not tracer.is_initialized():
+                print('Please use OutlierTracer.initialize(model) before using the OutlierAwareLinear layer')
+            outlier_idx = tracer.get_outliers(self.weight)
+            #print(outlier_idx, tracer.get_hvalue(self.weight))
+            self.outlier_dim = outlier_idx
+
+        if not self.is_quantized:
+            w = self.quantize_weight(self.weight, self.outlier_dim)
+            self.weight.data.copy_(w)
+            self.is_quantized = True
+
+        return self.forward_with_outliers(x, self.outlier_dim)
 
 
 class Int8Params(torch.nn.Parameter):
@@ -289,6 +318,7 @@ class Linear8bitLt(nn.Linear):
             self.bias.data = self.bias.data.to(x.dtype)
 
         out = bnb.matmul(x, self.weight, bias=self.bias, state=self.state)
+
         if not self.state.has_fp16_weights:
             if self.state.CB is not None and self.state.CxB is not None:
                 # we converted 8-bit row major to turing/ampere format in the first inference pass
@@ -296,3 +326,45 @@ class Linear8bitLt(nn.Linear):
                 del self.state.CB
                 self.weight.data = self.state.CxB
         return out
+
+
+class SwitchBackLinearBnb(nn.Linear):
+    def __init__(
+        self,
+        input_features,
+        output_features,
+        bias=True,
+        has_fp16_weights=True,
+        memory_efficient_backward=False,
+        threshold=0.0,
+        index=None,
+    ):
+        super().__init__(
+            input_features, output_features, bias
+        )
+        self.state = bnb.MatmulLtState()
+        self.index = index
+
+        self.state.threshold = threshold
+        self.state.has_fp16_weights = has_fp16_weights
+        self.state.memory_efficient_backward = memory_efficient_backward
+        if threshold > 0.0 and not has_fp16_weights:
+            self.state.use_pool = True
+
+        self.weight = Int8Params(
+            self.weight.data, has_fp16_weights=has_fp16_weights, requires_grad=has_fp16_weights
+        )
+
+    def init_8bit_state(self):
+        self.state.CB = self.weight.CB
+        self.state.SCB = self.weight.SCB
+        self.weight.CB = None
+        self.weight.SCB = None
+
+    def forward(self, x):
+        self.state.is_training = self.training
+
+        if self.weight.CB is not None:
+            self.init_8bit_state()
+
+        out = bnb.matmul_mixed(x.half(), self.weight.half(), bias=None, state=self.state) + self.bias

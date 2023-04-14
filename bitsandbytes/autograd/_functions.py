@@ -486,7 +486,6 @@ class MatMul8bitLt(torch.autograd.Function):
 
         return grad_A, grad_B, None, grad_bias, None
 
-
 def matmul(
     A: tensor,
     B: tensor,
