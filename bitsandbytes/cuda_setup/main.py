@@ -32,7 +32,7 @@ from .env_vars import get_potentially_lib_path_containing_env_vars
 # libcudart.so is missing by default for a conda install with PyTorch 2.0 and instead
 # we have libcudart.so.11.0 which causes a lot of errors before
 # not sure if libcudart.so.12.0 exists in pytorch installs, but it does not hurt
-CUDA_RUNTIME_LIBS: list = ["libcudart.so", 'libcudart.so.11.0', 'libcudart.so.12.0']
+CUDA_RUNTIME_LIBS: list = ["libcudart.so", 'libcudart.so.11.0', 'libcudart.so.12.0', 'cudart64_110.dll']
 
 IS_WINDOWS_PLATFORM: bool = (platform.system()=="Windows")
 PATH_COLLECTION_SEPARATOR: str = ":" if not IS_WINDOWS_PLATFORM else ";"
@@ -214,12 +214,12 @@ def find_cuda_lib_in(paths_list_candidate: str) -> Set[Path]:
 def warn_in_case_of_duplicates(results_paths: Set[Path]) -> None:
     if len(results_paths) > 1:
         warning_msg = (
-            f"Found duplicate {CUDA_RUNTIME_LIBS} files: {results_paths}.. "
+            f"Found duplicate {CUDA_RUNTIME_LIB} files: {results_paths}.. "
             "We'll flip a coin and try one of these, in order to fail forward.\n"
             "Either way, this might cause trouble in the future:\n"
             "If you get `CUDA error: invalid device function` errors, the above "
             "might be the cause and the solution is to make sure only one "
-            f"{CUDA_RUNTIME_LIBS} in the paths that we search based on your env.")
+            f"{CUDA_RUNTIME_LIB} in the paths that we search based on your env.")
         CUDASetup.get_instance().add_log_entry(warning_msg, is_warning=True)
 
 
@@ -247,7 +247,7 @@ def determine_cuda_runtime_lib_path() -> Union[Path, None]:
             return next(iter(conda_cuda_libs))
 
         CUDASetup.get_instance().add_log_entry(f'{candidate_env_vars["CONDA_PREFIX"]} did not contain '
-            f'{CUDA_RUNTIME_LIBS} as expected! Searching further paths...', is_warning=True)
+            f'{CUDA_RUNTIME_LIB} as expected! Searching further paths...', is_warning=True)
 
     if "LD_LIBRARY_PATH" in candidate_env_vars:
         lib_ld_cuda_libs = find_cuda_lib_in(candidate_env_vars["LD_LIBRARY_PATH"])
@@ -257,7 +257,7 @@ def determine_cuda_runtime_lib_path() -> Union[Path, None]:
         warn_in_case_of_duplicates(lib_ld_cuda_libs)
 
         CUDASetup.get_instance().add_log_entry(f'{candidate_env_vars["LD_LIBRARY_PATH"]} did not contain '
-            f'{CUDA_RUNTIME_LIBS} as expected! Searching further paths...', is_warning=True)
+            f'{CUDA_RUNTIME_LIB} as expected! Searching further paths...', is_warning=True)
         
     if "PATH" in candidate_env_vars:
         lib_ld_cuda_libs = find_cuda_lib_in(candidate_env_vars["PATH"])
