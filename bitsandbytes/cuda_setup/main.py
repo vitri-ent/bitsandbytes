@@ -251,6 +251,14 @@ def determine_cuda_runtime_lib_path() -> Union[Path, None]:
         if conda_cuda_libs:
             return next(iter(conda_cuda_libs))
 
+        conda_libs_path = Path(candidate_env_vars["CONDA_PREFIX"]) / "bin"
+
+        conda_cuda_libs = find_cuda_lib_in(str(conda_libs_path))
+        warn_in_case_of_duplicates(conda_cuda_libs)
+
+        if conda_cuda_libs:
+            return next(iter(conda_cuda_libs))
+
         CUDASetup.get_instance().add_log_entry(f'{candidate_env_vars["CONDA_PREFIX"]} did not contain '
             f'{CUDA_RUNTIME_LIBS} as expected! Searching further paths...', is_warning=True)
 
