@@ -21,14 +21,15 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fp:fast")
 
 if( MAKE_CUDA_BUILD ) 
 
-    set(COMPUTE_CAPABILITY_NOCUBLAST 50 52 60 61 70 72)
-    set(COMPUTE_CAPABILITY_KEPLER 35 37)
-    set(COMPUTE_CAPABILITY_ADA_HOPPER 89 90)
+    # Appending -real to target archs to discard unneeded PTX code
+    set(COMPUTE_CAPABILITY_NOCUBLAST 50-real 52-real 60-real 61-real 70-real 72-real)
+    set(COMPUTE_CAPABILITY_KEPLER 35-real 37-real)
 
-    # Later versions of CUDA support the new architectures
+    # Later versions of CUDA support the new architectures   forgoing -real on latest arch to support future archs
     set(CC_CUDA10x 75)
-    set(CC_CUDA110 75 80)
-    set(CC_CUDA11x 75 80 86)
+    set(CC_CUDA110 75-real 80)
+    set(CC_CUDA11x 75-real 80-real 86)
+    set(CC_CUDA118 75-real 80-real 86-real 89-real 90)
 
     option(NO_CUBLASLT "Don't use CUBLAST" OFF)
     set(CUDA_TARGET_ARCH_FEATURE_LEVEL "11.x" CACHE STRING 
@@ -54,14 +55,17 @@ if( MAKE_CUDA_BUILD )
         endif()
         
     elseif(${CUDA_VERSION_TARGET_FEATURE_MAJOR} STREQUAL "11")
-        set(CMAKE_CUDA_ARCHITECTURES ${CC_CUDA11x})
+        set(CMAKE_CUDA_ARCHITECTURES ${CC_CUDA118})
+        if(${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "11.8")
+            set(CMAKE_CUDA_ARCHITECTURES ${CC_CUDA11x})
+        endif()
         if(NO_CUBLASLT)
             list(APPEND CMAKE_CUDA_ARCHITECTURES ${COMPUTE_CAPABILITY_NOCUBLAST} ${COMPUTE_CAPABILITY_KEPLER})
         endif()
     elseif(${CUDA_VERSION_TARGET_FEATURE_MAJOR} STREQUAL "12")
-        set(CMAKE_CUDA_ARCHITECTURES ${CC_CUDA11x})
+        set(CMAKE_CUDA_ARCHITECTURES ${CC_CUDA118})
         if(NO_CUBLASLT)
-            list(APPEND CMAKE_CUDA_ARCHITECTURES ${COMPUTE_CAPABILITY_NOCUBLAST} ${COMPUTE_CAPABILITY_ADA_HOPPER})
+            list(APPEND CMAKE_CUDA_ARCHITECTURES ${COMPUTE_CAPABILITY_NOCUBLAST})
         endif()
     else()
         set(CMAKE_CUDA_ARCHITECTURES ${CC_CUDA10x})
