@@ -40,7 +40,7 @@ backup_paths = []
 
 IS_WINDOWS_PLATFORM: bool = (platform.system()=="Windows")
 PATH_COLLECTION_SEPARATOR: str = ":" if not IS_WINDOWS_PLATFORM else ";"
-CUDA_RUNTIME_LIBS: list = ["libcudart.so", 'libcudart.so.11.0', 'libcudart.so.12.0'] if not IS_WINDOWS_PLATFORM else ["cudart64_110.dll", "cudart64_120.dll"]
+CUDA_RUNTIME_LIBS: list = ["libcudart.so", 'libcudart.so.11.0', 'libcudart.so.12.0'] if not IS_WINDOWS_PLATFORM else ["cudart64_110.dll", "cudart64_120.dll", "cudart64_12.dll"]
 backup_paths.append('$CONDA_PREFIX/lib/libcudart.so.11.0' if not IS_WINDOWS_PLATFORM else '%CONDA_PREFIX%\\lib\\cudart64_110.dll')
 CUDA_SHARED_LIB_NAME: str = "libcuda.so" if not IS_WINDOWS_PLATFORM else f"{os.environ['SystemRoot']}\\System32\\nvcuda.dll"
 SHARED_LIB_EXTENSION: str = ".so" if not IS_WINDOWS_PLATFORM else ".dll"
