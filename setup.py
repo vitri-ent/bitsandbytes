@@ -27,6 +27,7 @@ setup(
     url="https://github.com/TimDettmers/bitsandbytes",
     packages=find_packages(),
     package_data={"": libs},
+    install_requires=['scipy'],
     long_description=read("README.md"),
     long_description_content_type="text/markdown",
     classifiers=[
