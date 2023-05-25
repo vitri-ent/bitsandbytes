@@ -6,7 +6,7 @@ from typing import Tuple, Optional
 
 import torch
 
-import bitsandbytes.functional as F
+import bitsandbytes_win8bit.functional as F
 
 
 # math.prod not compatible with python < 3.8

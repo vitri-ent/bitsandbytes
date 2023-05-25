@@ -3,7 +3,7 @@ from itertools import permutations, product
 import pytest
 import torch
 
-import bitsandbytes as bnb
+import bitsandbytes_win8bit as bnb
 
 n = 1
 k = 25

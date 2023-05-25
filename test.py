@@ -1,1 +1,1 @@
-import bitsandbytes
+import bitsandbytes_win8bit

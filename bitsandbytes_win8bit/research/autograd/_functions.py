@@ -5,9 +5,9 @@ from functools import reduce  # Required in Python 3
 
 import torch
 
-import bitsandbytes.functional as F
+import bitsandbytes_win8bit.functional as F
 
-from bitsandbytes.autograd._functions import MatmulLtState, GlobalOutlierPooler
+from bitsandbytes_win8bit.autograd._functions import MatmulLtState, GlobalOutlierPooler
 
 
 # math.prod not compatible with python < 3.8

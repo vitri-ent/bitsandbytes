@@ -6,10 +6,10 @@ from tempfile import TemporaryDirectory
 import pytest
 import torch
 
-import bitsandbytes as bnb
-from bitsandbytes import functional as F
-from bitsandbytes.autograd import get_inverse_transform_indices, undo_layout
-from bitsandbytes.nn.modules import Linear8bitLt
+import bitsandbytes_win8bit as bnb
+from bitsandbytes_win8bit import functional as F
+from bitsandbytes_win8bit.autograd import get_inverse_transform_indices, undo_layout
+from bitsandbytes_win8bit.nn.modules import Linear8bitLt
 
 
 # contributed by Alex Borzunov, see:

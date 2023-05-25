@@ -5,7 +5,7 @@ import torch
 from pathlib import Path
 from warnings import warn
 
-from bitsandbytes.cuda_setup.main import CUDASetup
+from bitsandbytes_win8bit.cuda_setup.main import CUDASetup
 
 
 setup = CUDASetup.get_instance()

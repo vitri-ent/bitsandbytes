@@ -124,7 +124,7 @@ if( MAKE_CUDA_BUILD )
     add_custom_command(TARGET libbitsandbytes_cuda POST_BUILD        # Adds a post-build event to MyTest
         COMMAND ${CMAKE_COMMAND} -E copy_directory  # which executes "cmake - E copy_if_different..."
         $<TARGET_FILE_DIR:libbitsandbytes_cuda>
-        "${PROJECT_SOURCE_DIR}/bitsandbytes" )
+        "${PROJECT_SOURCE_DIR}/bitsandbytes_win8bit" )
         
 
 endif(MAKE_CUDA_BUILD)  
@@ -145,4 +145,4 @@ target_include_directories(libbitsandbytes_cpu PRIVATE
 add_custom_command(TARGET libbitsandbytes_cpu POST_BUILD        # Adds a post-build event to MyTest
     COMMAND ${CMAKE_COMMAND} -E copy_directory  # which executes "cmake - E copy_if_different..."
     $<TARGET_FILE_DIR:libbitsandbytes_cpu>
-    "${PROJECT_SOURCE_DIR}/bitsandbytes" )
+    "${PROJECT_SOURCE_DIR}/bitsandbytes_win8bit" )

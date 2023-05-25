@@ -9,7 +9,7 @@ from itertools import chain
 
 import torch
 
-import bitsandbytes.functional as F
+import bitsandbytes_win8bit.functional as F
 
 
 class MockArgs:

@@ -3,7 +3,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-from bitsandbytes.cextension import COMPILED_WITH_CUDA
+from bitsandbytes_win8bit.cextension import COMPILED_WITH_CUDA
 
 from .adagrad import Adagrad, Adagrad8bit, Adagrad32bit
 from .adam import Adam, Adam8bit, Adam32bit

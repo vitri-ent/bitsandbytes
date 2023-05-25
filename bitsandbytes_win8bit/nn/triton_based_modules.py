@@ -3,14 +3,14 @@ import torch.nn as nn
 import time
 from functools import partial
 
-from bitsandbytes.triton.triton_utils import is_triton_available
+from bitsandbytes_win8bit.triton.triton_utils import is_triton_available
 
-from bitsandbytes.triton.dequantize_rowwise import dequantize_rowwise
-from bitsandbytes.triton.quantize_rowwise import quantize_rowwise
-from bitsandbytes.triton.quantize_columnwise_and_transpose import quantize_columnwise_and_transpose
-from bitsandbytes.triton.int8_matmul_rowwise_dequantize import int8_matmul_rowwise_dequantize
-from bitsandbytes.triton.quantize_global import quantize_global, quantize_global_transpose
-from bitsandbytes.triton.int8_matmul_mixed_dequanitze import int8_matmul_mixed_dequanitze
+from bitsandbytes_win8bit.triton.dequantize_rowwise import dequantize_rowwise
+from bitsandbytes_win8bit.triton.quantize_rowwise import quantize_rowwise
+from bitsandbytes_win8bit.triton.quantize_columnwise_and_transpose import quantize_columnwise_and_transpose
+from bitsandbytes_win8bit.triton.int8_matmul_rowwise_dequantize import int8_matmul_rowwise_dequantize
+from bitsandbytes_win8bit.triton.quantize_global import quantize_global, quantize_global_transpose
+from bitsandbytes_win8bit.triton.int8_matmul_mixed_dequanitze import int8_matmul_mixed_dequanitze
 
 
 class _switchback_global(torch.autograd.Function):

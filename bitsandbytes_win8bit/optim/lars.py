@@ -5,7 +5,7 @@
 import torch
 from torch.optim import Optimizer
 
-from bitsandbytes.optim.optimizer import Optimizer1State
+from bitsandbytes_win8bit.optim.optimizer import Optimizer1State
 
 
 class LARS(Optimizer1State):

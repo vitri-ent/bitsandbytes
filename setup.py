@@ -7,7 +7,7 @@ import os
 
 from setuptools import find_packages, setup
 
-libs = list(glob.glob("./bitsandbytes/libbitsandbytes*.*"))
+libs = list(glob.glob("./bitsandbytes_win8bit/libbitsandbytes*.*"))
 libs = [os.path.basename(p) for p in libs]
 print("libs:", libs)
 
@@ -17,7 +17,7 @@ def read(fname):
 
 
 setup(
-    name=f"bitsandbytes",
+    name=f"bitsandbytes_win8bit",
     version=f"0.38.1",
     author="Tim Dettmers",
     author_email="dettmers@cs.washington.edu",

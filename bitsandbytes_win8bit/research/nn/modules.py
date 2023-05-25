@@ -4,9 +4,9 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, device, dtype, nn
 
-import bitsandbytes as bnb
-from bitsandbytes.optim import GlobalOptimManager
-from bitsandbytes.utils import OutlierTracer, find_outlier_dims
+import bitsandbytes_win8bit as bnb
+from bitsandbytes_win8bit.optim import GlobalOptimManager
+from bitsandbytes_win8bit.utils import OutlierTracer, find_outlier_dims
 
 T = TypeVar("T", bound="torch.nn.Module")
 

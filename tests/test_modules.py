@@ -4,7 +4,7 @@ import pytest
 import torch
 from torch import nn
 
-import bitsandbytes as bnb
+import bitsandbytes_win8bit as bnb
 
 
 class MockArgs:

@@ -2,7 +2,7 @@
 #
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
-from bitsandbytes.optim.optimizer import Optimizer1State
+from bitsandbytes_win8bit.optim.optimizer import Optimizer1State
 
 
 class RMSprop(Optimizer1State):

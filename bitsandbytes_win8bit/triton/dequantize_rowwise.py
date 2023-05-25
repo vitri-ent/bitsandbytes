@@ -1,7 +1,7 @@
 import math
 import torch
 import time
-from bitsandbytes.triton.triton_utils import is_triton_available
+from bitsandbytes_win8bit.triton.triton_utils import is_triton_available
 
 if not is_triton_available():
     def dequantize_rowwise(x: torch.Tensor, state_x: torch.Tensor): return None

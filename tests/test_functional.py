@@ -8,8 +8,8 @@ import pytest
 import torch
 import numpy as np
 
-import bitsandbytes as bnb
-from bitsandbytes import functional as F
+import bitsandbytes_win8bit as bnb
+from bitsandbytes_win8bit import functional as F
 from scipy.stats import norm
 
 torch.set_printoptions(

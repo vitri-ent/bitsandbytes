@@ -9,8 +9,8 @@ import os
 import torch
 import torch.distributed as dist
 
-import bitsandbytes.functional as F
-from bitsandbytes.optim.optimizer import Optimizer2State
+import bitsandbytes_win8bit.functional as F
+from bitsandbytes_win8bit.optim.optimizer import Optimizer2State
 
 
 class Adam(Optimizer2State):

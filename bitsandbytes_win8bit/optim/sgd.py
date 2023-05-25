@@ -2,104 +2,98 @@
 #
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
-from bitsandbytes.optim.optimizer import Optimizer2State
+from bitsandbytes_win8bit.optim.optimizer import Optimizer1State
 
 
-class LAMB(Optimizer2State):
+class SGD(Optimizer1State):
     def __init__(
         self,
         params,
-        lr=1e-3,
-        bias_correction=True,
-        betas=(0.9, 0.999),
-        eps=1e-8,
+        lr,
+        momentum=0,
+        dampening=0,
         weight_decay=0,
-        amsgrad=False,
-        adam_w_mode=True,
+        nesterov=False,
         optim_bits=32,
         args=None,
         min_8bit_size=4096,
         percentile_clipping=100,
-        block_wise=False,
-        max_unorm=1.0,
+        block_wise=True,
     ):
+        if momentum == 0:
+            raise NotImplementedError("SGD without momentum is not supported!")
         super().__init__(
-            "lamb",
+            "momentum",
             params,
             lr,
-            betas,
-            eps,
+            (momentum, dampening),
+            0.0,
             weight_decay,
             optim_bits,
             args,
             min_8bit_size,
             percentile_clipping,
             block_wise,
-            max_unorm=1.0,
         )
 
 
-class LAMB8bit(Optimizer2State):
+class SGD8bit(Optimizer1State):
     def __init__(
         self,
         params,
-        lr=1e-3,
-        bias_correction=True,
-        betas=(0.9, 0.999),
-        eps=1e-8,
+        lr,
+        momentum=0,
+        dampening=0,
         weight_decay=0,
-        amsgrad=False,
-        adam_w_mode=True,
+        nesterov=False,
         args=None,
         min_8bit_size=4096,
         percentile_clipping=100,
-        block_wise=False,
-        max_unorm=1.0,
+        block_wise=True,
     ):
+        if momentum == 0:
+            raise NotImplementedError("SGD without momentum is not supported!")
         super().__init__(
-            "lamb",
+            "momentum",
             params,
             lr,
-            betas,
-            eps,
+            (momentum, dampening),
+            0.0,
             weight_decay,
             8,
             args,
             min_8bit_size,
             percentile_clipping,
             block_wise,
-            max_unorm=1.0,
         )
 
 
-class LAMB32bit(Optimizer2State):
+class SGD32bit(Optimizer1State):
     def __init__(
         self,
         params,
-        lr=1e-3,
-        bias_correction=True,
-        betas=(0.9, 0.999),
-        eps=1e-8,
+        lr,
+        momentum=0,
+        dampening=0,
         weight_decay=0,
-        amsgrad=False,
-        adam_w_mode=True,
+        nesterov=False,
         args=None,
         min_8bit_size=4096,
         percentile_clipping=100,
-        block_wise=False,
-        max_unorm=1.0,
+        block_wise=True,
     ):
+        if momentum == 0:
+            raise NotImplementedError("SGD without momentum is not supported!")
         super().__init__(
-            "lamb",
+            "momentum",
             params,
             lr,
-            betas,
-            eps,
+            (momentum, dampening),
+            0.0,
             weight_decay,
             32,
             args,
             min_8bit_size,
             percentile_clipping,
             block_wise,
-            max_unorm=1.0,
         )

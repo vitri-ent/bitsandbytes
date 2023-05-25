@@ -11,8 +11,8 @@ from lion_pytorch import Lion
 
 import torch
 
-import bitsandbytes as bnb
-import bitsandbytes.functional as F
+import bitsandbytes_win8bit as bnb
+import bitsandbytes_win8bit.functional as F
 
 # import apex
 

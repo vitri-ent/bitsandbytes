@@ -117,7 +117,7 @@ Running a quick check that:
 print("\nWARNING: Please be sure to sanitize sensible info from any such env vars!\n")
 
 try:
-    from bitsandbytes.optim import Adam
+    from bitsandbytes_win8bit.optim import Adam
 
     p = torch.nn.Parameter(torch.rand(10, 10).cuda())
     a = torch.rand(10, 10).cuda()

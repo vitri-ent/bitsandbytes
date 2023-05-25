@@ -1,6 +1,6 @@
 import torch
 
-from bitsandbytes.triton.triton_utils import is_triton_available
+from bitsandbytes_win8bit.triton.triton_utils import is_triton_available
 
 if not is_triton_available():
     def int8_matmul_rowwise_dequantize(a, b, state_x, state_w, bias): return None

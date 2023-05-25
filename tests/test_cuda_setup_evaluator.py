@@ -3,8 +3,8 @@ from typing import List, NamedTuple
 import platform
 import pytest
 
-import bitsandbytes as bnb
-from bitsandbytes.cuda_setup.main import (
+import bitsandbytes_win8bit as bnb
+from bitsandbytes_win8bit.cuda_setup.main import (
     determine_cuda_runtime_lib_path,
     evaluate_cuda_setup,
     extract_candidate_paths,
