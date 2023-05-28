@@ -121,10 +121,17 @@ if( MAKE_CUDA_BUILD )
         curand
         cusparse
     )
-    add_custom_command(TARGET libbitsandbytes_cuda POST_BUILD        # Adds a post-build event to MyTest
-        COMMAND ${CMAKE_COMMAND} -E copy_directory  # which executes "cmake - E copy_if_different..."
-        $<TARGET_FILE_DIR:libbitsandbytes_cuda>
-        "${PROJECT_SOURCE_DIR}/bitsandbytes" )
+    if(DEFINED CIBUILD)
+        add_custom_command(TARGET libbitsandbytes_cuda POST_BUILD        # Adds a post-build event to MyTest
+            COMMAND ${CMAKE_COMMAND} -E copy_directory  # which executes "cmake - E copy_if_different..."
+            $<TARGET_FILE_DIR:libbitsandbytes_cuda>
+            "${PROJECT_SOURCE_DIR}/BuildArtifacts" )
+    else()
+        add_custom_command(TARGET libbitsandbytes_cuda POST_BUILD        # Adds a post-build event to MyTest
+            COMMAND ${CMAKE_COMMAND} -E copy_directory  # which executes "cmake - E copy_if_different..."
+            $<TARGET_FILE_DIR:libbitsandbytes_cuda>
+            "${PROJECT_SOURCE_DIR}/bitsandbytes" )
+    endif()
         
 
 endif(MAKE_CUDA_BUILD)  
@@ -142,7 +149,14 @@ target_include_directories(libbitsandbytes_cpu PRIVATE
     "${PROJECT_SOURCE_DIR}/csrc/"
     "${PROJECT_SOURCE_DIR}/include/"
 )
-add_custom_command(TARGET libbitsandbytes_cpu POST_BUILD        # Adds a post-build event to MyTest
-    COMMAND ${CMAKE_COMMAND} -E copy_directory  # which executes "cmake - E copy_if_different..."
-    $<TARGET_FILE_DIR:libbitsandbytes_cpu>
-    "${PROJECT_SOURCE_DIR}/bitsandbytes" )
+if(DEFINED CIBUILD)
+    add_custom_command(TARGET libbitsandbytes_cpu POST_BUILD        # Adds a post-build event to MyTest
+        COMMAND ${CMAKE_COMMAND} -E copy_directory  # which executes "cmake - E copy_if_different..."
+        $<TARGET_FILE_DIR:libbitsandbytes_cpu>
+        "${PROJECT_SOURCE_DIR}/BuildArtifacts" )
+else()
+    add_custom_command(TARGET libbitsandbytes_cpu POST_BUILD        # Adds a post-build event to MyTest
+        COMMAND ${CMAKE_COMMAND} -E copy_directory  # which executes "cmake - E copy_if_different..."
+        $<TARGET_FILE_DIR:libbitsandbytes_cpu>
+        "${PROJECT_SOURCE_DIR}/bitsandbytes" )
+endif()
