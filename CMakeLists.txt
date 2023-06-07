@@ -3,7 +3,8 @@ list(APPEND CMAKE_PREFIX_PATH $CONDA_PREFIX)
 
 project(bitsandbytes LANGUAGES CXX CUDA)
 
-set(CXX_STANDARD_REQUIRED C++14)
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(FILES_CUDA csrc/ops.cu csrc/kernels.cu)
 set(FILES_CPP csrc/common.cpp csrc/cpu_ops.cpp csrc/pythonInterface.c)
 
