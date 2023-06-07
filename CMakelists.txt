@@ -1,0 +1,161 @@
+cmake_minimum_required(VERSION 3.21)
+list(APPEND CMAKE_PREFIX_PATH $CONDA_PREFIX)
+
+project(bitsandbytes LANGUAGES CXX CUDA)
+
+set(CXX_STANDARD_REQUIRED C++14)
+set(FILES_CUDA csrc/ops.cu csrc/kernels.cu)
+set(FILES_CPP csrc/common.cpp csrc/cpu_ops.cpp csrc/pythonInterface.c)
+
+option(MAKE_CUDA_BUILD "Build using CUDA" ON)
+option(USE_AVX2 "AVX2 Instruction Set" ON)
+option(USE_AVX "AVX Instruction Set" ON)
+
+if(USE_AVX2)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX2") 
+elseif(USE_AVX)    
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX") 
+endif()
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fp:fast")
+
+if( MAKE_CUDA_BUILD ) 
+
+    # Appending -real to target archs to discard unneeded PTX code
+    # No support for compute less than 7.0 in latest version
+    set(COMPUTE_CAPABILITY_NOCUBLAST 70-real 72-real)
+
+    # Later versions of CUDA support the new architectures   forgoing -real on latest arch to support future archs
+    set(CC_CUDA10x 75)
+    set(CC_CUDA110 75-real 80)
+    set(CC_CUDA11x 75-real 80-real 86)
+    set(CC_CUDA118 75-real 80-real 86-real 89-real 90)
+
+    option(NO_CUBLASLT "Don't use CUBLAST" OFF)
+    set(CUDA_TARGET_ARCH_FEATURE_LEVEL "11.x" CACHE STRING 
+        "CUDA Target Architectures by Feature Level. SO name is autodetected from installed cuda compiler.\n \
+        Examples : 10.0, 11.0, 11.x, 12.x\n \
+        \n \
+        Note : to change the CUDA compiler you're using and the SO NAME\n \
+            - Clean the build folder\n ")
+
+    set(CUDA_VERSION_LIBNAME "")
+    set(CUDA_VERSION_TARGET_FEATURE_MAJOR "")
+    string(REGEX MATCH "[0123456789]+\.[0123456789]+" CUDA_VERSION_LIBNAME "${CMAKE_CUDA_COMPILER_VERSION}")
+    string(REPLACE "." "" CUDA_VERSION_LIBNAME "${CUDA_VERSION_LIBNAME}")
+    string(REGEX MATCH "[^\.]+" CUDA_VERSION_TARGET_FEATURE_MAJOR "${CUDA_TARGET_ARCH_FEATURE_LEVEL}")
+
+    message(CONFIGURE_LOG "\nConfiguring using Cuda Compiler ${CMAKE_CUDA_COMPILER_VERSION}\n")
+
+    if(${CUDA_TARGET_ARCH_FEATURE_LEVEL} STREQUAL "11.0")
+        set(CMAKE_CUDA_ARCHITECTURES ${CC_CUDA110})
+        if(NO_CUBLASLT)
+            list(APPEND CMAKE_CUDA_ARCHITECTURES ${COMPUTE_CAPABILITY_NOCUBLAST})
+        endif()
+        
+    elseif(${CUDA_VERSION_TARGET_FEATURE_MAJOR} STREQUAL "11")
+        set(CMAKE_CUDA_ARCHITECTURES ${CC_CUDA118})
+        if(${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "11.8")
+            set(CMAKE_CUDA_ARCHITECTURES ${CC_CUDA11x})
+        endif()
+        if(NO_CUBLASLT)
+            list(APPEND CMAKE_CUDA_ARCHITECTURES ${COMPUTE_CAPABILITY_NOCUBLAST})
+        endif()
+    elseif(${CUDA_VERSION_TARGET_FEATURE_MAJOR} STREQUAL "12")
+        set(CMAKE_CUDA_ARCHITECTURES ${CC_CUDA118})
+        if(NO_CUBLASLT)
+            list(APPEND CMAKE_CUDA_ARCHITECTURES ${COMPUTE_CAPABILITY_NOCUBLAST})
+        endif()
+    else()
+        set(CMAKE_CUDA_ARCHITECTURES ${CC_CUDA10x})
+        list(APPEND CMAKE_CUDA_ARCHITECTURES ${COMPUTE_CAPABILITY_NOCUBLAST})
+        set(NO_CUBLASLT ON)
+    endif()
+
+
+
+    message(CONFIGURE_LOG " CUDA Targeting feature level ${CUDA_TARGET_ARCH_FEATURE_LEVEL}, with architectures ${CMAKE_CUDA_ARCHITECTURES}")
+    
+    set (LIBBITSANDBYTESNAME "libbitsandbytes_cuda${CUDA_VERSION_LIBNAME}")
+    if(NO_CUBLASLT)
+        set (LIBBITSANDBYTESNAME "libbitsandbytes_cuda${CUDA_VERSION_LIBNAME}_nocublaslt")
+    endif(NO_CUBLASLT)
+
+    message(CONFIGURE_LOG " Shared library name being used: ${LIBBITSANDBYTESNAME}")
+
+    if(NOT DEFINED CMAKE_CUDA_STANDARD)
+        set(CMAKE_CUDA_STANDARD 11)
+        set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+    endif()
+
+    set(ADDITIONAL_CUDA_FLAGS "--use_fast_math")
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${ADDITIONAL_CUDA_FLAGS}")
+
+    add_library(libbitsandbytes_cuda SHARED 
+        ${FILES_CPP}
+        ${FILES_CUDA}
+    )
+    set_source_files_properties(${FILES_CPP} PROPERTIES LANGUAGE CXX)
+    set_target_properties(libbitsandbytes_cuda PROPERTIES COMPILE_DEFINITIONS "BUILD_CUDA")
+    if(NO_CUBLASLT)
+        set_target_properties(libbitsandbytes_cuda PROPERTIES COMPILE_DEFINITIONS "BUILD_CUDA;NO_CUBLASLT")
+    endif(NO_CUBLASLT)
+
+    
+    set_target_properties(libbitsandbytes_cuda PROPERTIES
+        POSITION_INDEPENDENT_CODE ON
+        CUDA_SEPARABLE_COMPILATION ON
+        PREFIX ""
+        OUTPUT_NAME "${LIBBITSANDBYTESNAME}"
+        LINKER_LANGUAGE C 
+        WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
+    target_include_directories(libbitsandbytes_cuda PRIVATE
+        "${PROJECT_SOURCE_DIR}/csrc/"
+        "${PROJECT_SOURCE_DIR}/include/"
+    )
+    target_link_libraries(libbitsandbytes_cuda PRIVATE 
+        cudart
+        cublas
+        cublasLt
+        curand
+        cusparse
+    )
+    if(DEFINED CIBUILD)
+        add_custom_command(TARGET libbitsandbytes_cuda POST_BUILD        # Adds a post-build event to MyTest
+            COMMAND ${CMAKE_COMMAND} -E copy_directory  # which executes "cmake - E copy_if_different..."
+            $<TARGET_FILE_DIR:libbitsandbytes_cuda>
+            "${PROJECT_SOURCE_DIR}/BuildArtifacts" )
+    else()
+        add_custom_command(TARGET libbitsandbytes_cuda POST_BUILD        # Adds a post-build event to MyTest
+            COMMAND ${CMAKE_COMMAND} -E copy_directory  # which executes "cmake - E copy_if_different..."
+            $<TARGET_FILE_DIR:libbitsandbytes_cuda>
+            "${PROJECT_SOURCE_DIR}/bitsandbytes" )
+    endif()
+        
+
+endif(MAKE_CUDA_BUILD)  
+
+add_library(libbitsandbytes_cpu SHARED 
+    ${FILES_CPP}
+)
+set_source_files_properties(${FILES_CPP} PROPERTIES LANGUAGE CXX)
+set_target_properties(libbitsandbytes_cpu PROPERTIES 
+    POSITION_INDEPENDENT_CODE ON
+    WINDOWS_EXPORT_ALL_SYMBOLS TRUE
+    )
+
+target_include_directories(libbitsandbytes_cpu PRIVATE
+    "${PROJECT_SOURCE_DIR}/csrc/"
+    "${PROJECT_SOURCE_DIR}/include/"
+)
+if(DEFINED CIBUILD)
+    add_custom_command(TARGET libbitsandbytes_cpu POST_BUILD        # Adds a post-build event to MyTest
+        COMMAND ${CMAKE_COMMAND} -E copy_directory  # which executes "cmake - E copy_if_different..."
+        $<TARGET_FILE_DIR:libbitsandbytes_cpu>
+        "${PROJECT_SOURCE_DIR}/BuildArtifacts" )
+else()
+    add_custom_command(TARGET libbitsandbytes_cpu POST_BUILD        # Adds a post-build event to MyTest
+        COMMAND ${CMAKE_COMMAND} -E copy_directory  # which executes "cmake - E copy_if_different..."
+        $<TARGET_FILE_DIR:libbitsandbytes_cpu>
+        "${PROJECT_SOURCE_DIR}/bitsandbytes" )
+endif()
