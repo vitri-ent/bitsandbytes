@@ -2,6 +2,7 @@ import os
 import sys
 import shlex
 import subprocess
+import platform
 
 from warnings import warn
 from typing import Tuple
@@ -10,6 +11,8 @@ from os.path import isdir
 import torch
 
 HEADER_WIDTH = 60
+IS_WINDOWS_PLATFORM: bool = (platform.system()=="Windows")
+SHARED_LIB_EXTENSION: str = "so" if not IS_WINDOWS_PLATFORM else "dll"
 
 def execute_and_return(command_string: str) -> Tuple[str, str]:
     def _decode(subprocess_err_out_tuple):
@@ -31,10 +34,10 @@ def execute_and_return(command_string: str) -> Tuple[str, str]:
     return std_out, std_err
 
 def find_file_recursive(folder, filename):
-    cmd = f'find {folder} -name {filename}'
+    cmd = f'find {folder} -name {filename}' if not IS_WINDOWS_PLATFORM else f'where /R "{folder}" "{filename}"'
     out, err = execute_and_return(cmd)
     if len(err) > 0:
-        raise RuntimeError('Something when wrong when trying to find file. Maybe you do not have a linux system?')
+        raise RuntimeError('Something when wrong when trying to find file.')
 
     return out
 
@@ -44,34 +47,45 @@ def generate_bug_report_information():
     print_header("BUG REPORT INFORMATION")
     print_header("")
     print('')
-
+    
     if 'CONDA_PREFIX' in os.environ:
-        paths = find_file_recursive(os.environ['CONDA_PREFIX'], '*cuda*so')
+        paths = find_file_recursive(os.environ['CONDA_PREFIX'], f'*cuda*{SHARED_LIB_EXTENSION}')
         print_header("ANACONDA CUDA PATHS")
         print(paths)
         print('')
+    if 'CUDA_HOME' in os.environ:
+        paths = find_file_recursive(os.environ['CONDA_PREFIX'], f'*cuda*{SHARED_LIB_EXTENSION}')
+        print_header("CUDA_HOME CUDA PATHS")
+        print(paths)
+        print('')
+    elif 'CUDA_PATH' in os.environ:
+        paths = find_file_recursive(os.environ['CONDA_PREFIX'], f'*cuda*{SHARED_LIB_EXTENSION}')
+        print_header("CUDA_PATH CUDA PATHS")
+        print(paths)
+        print('')
     if isdir('/usr/local/'):
-        paths = find_file_recursive('/usr/local', '*cuda*so')
+        paths = find_file_recursive('/usr/local', '*cuda*' + SHARED_LIB_EXTENSION)
         print_header("/usr/local CUDA PATHS")
         print(paths)
         print('')
 
     if isdir(os.getcwd()):
-        paths = find_file_recursive(os.getcwd(), '*cuda*so')
+        paths = find_file_recursive(os.getcwd(), '*cuda*' + SHARED_LIB_EXTENSION)
         print_header("WORKING DIRECTORY CUDA PATHS")
         print(paths)
         print('')
 
-    print_header("LD_LIBRARY CUDA PATHS")
-    lib_path = os.environ['LD_LIBRARY_PATH'].strip()
-    for path in set(lib_path.split(':')):
-        try:
-            if isdir(path):
-                print_header(f"{path} CUDA PATHS")
-                paths = find_file_recursive(path, '*cuda*so')
-                print(paths)
-        except:
-            print(f'Could not read LD_LIBRARY_PATH: {path}')
+    if 'LD_LIBRARY_PATH' in os.environ:
+        print_header("LD_LIBRARY CUDA PATHS")
+        lib_path = os.environ['LD_LIBRARY_PATH'].strip()
+        for path in set(lib_path.split(':' if not IS_WINDOWS_PLATFORM else ';')):
+            try:
+                if isdir(path):
+                    print_header(f"{path} CUDA PATHS")
+                    paths = find_file_recursive(path, '*cuda*' + SHARED_LIB_EXTENSION)
+                    print(paths)
+            except:
+                print(f'Could not read LD_LIBRARY_PATH: {path}')
     print('')
 
 
@@ -151,4 +165,3 @@ except Exception as e:
     print(e)
     print_debug_info()
     sys.exit(1)
-
