@@ -24,4 +24,4 @@ __pdoc__ = {
     "optim.optimizer.MockArgs": False,
 }
 
-PACKAGE_GITHUB_URL = "https://github.com/TimDettmers/bitsandbytes"
+PACKAGE_GITHUB_URL = "https://github.com/jllllll/bitsandbytes"
