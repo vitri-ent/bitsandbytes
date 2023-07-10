@@ -155,34 +155,36 @@ def test_dynamic_quantization():
 
 
 
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float16, torch.bfloat16], ids=["fp32", "fp16", "bf16"])
 @pytest.mark.parametrize("nested", [False, True], ids=["False", "True"])
 @pytest.mark.parametrize("blocksize", [4096, 2048, 1024, 512, 256, 128, 64])
-def test_dynamic_blockwise_quantization(nested, blocksize):
+def test_dynamic_blockwise_quantization(dtype, nested, blocksize):
     #print('')
     diffs = []
     reldiffs = []
     for i in range(100):
-        A1 = torch.randn(1024, 1024, device=DEFAULT_DEVICE)
+        A1 = torch.randn(1024, 1024, device=DEFAULT_DEVICE, dtype=dtype)
         C, S = F.quantize_blockwise(A1, blocksize=blocksize, nested=nested)
         A2 = F.dequantize_blockwise(C, S)
-        diff = torch.abs(A1 - A2)
-        reldiff = diff / torch.abs(A1 + 1e-8)
+        diff = torch.abs(A1 - A2).float()
+        reldiff = diff / torch.abs(A1.float() + 1e-8)
         diffs.append(diff.mean().item())
         reldiffs.append(reldiff.mean().item())
     abserr = sum(diffs)/len(diffs)
     relerr = sum(reldiffs)/len(reldiffs)
+    #print('nested=', nested, 'randn', blocksize, 'dtype', dtype, sum(diffs)/len(diffs))
+    #print('nested=', nested, 'randn', blocksize, 'dtype', dtype, sum(reldiffs)/len(reldiffs))
     assert abserr < 0.011
     assert relerr < 0.018
-    #print('nested=', nested, 'randn', blocksize, sum(diffs)/len(diffs))
-    #print('nested=', nested, 'randn', blocksize, sum(reldiffs)/len(reldiffs))
+    assert A2.dtype == dtype
 
     diffs = []
     for i in range(100):
-        A1 = torch.rand(1024, 1024, device=DEFAULT_DEVICE)
+        A1 = torch.rand(1024, 1024, device=DEFAULT_DEVICE, dtype=dtype)
         C, S = F.quantize_blockwise(A1, blocksize=blocksize, nested=nested)
         A2 = F.dequantize_blockwise(C, S)
-        diff = torch.abs(A1 - A2)
-        reldiff = diff / torch.abs(A1 + 1e-8)
+        diff = torch.abs(A1 - A2).float()
+        reldiff = diff / torch.abs(A1.float() + 1e-8)
         diffs.append(diff.mean().item())
         reldiffs.append(reldiff.mean().item())
         #torch.testing.assert_close(A1, A2, atol=1e-2, rtol=0)
@@ -190,6 +192,7 @@ def test_dynamic_blockwise_quantization(nested, blocksize):
     relerr = sum(reldiffs)/len(reldiffs)
     assert abserr < 0.0035
     assert relerr < 0.015
+    assert A2.dtype == dtype
     #print('nested=', nested, 'rand', blocksize, sum(diffs)/len(diffs))
     #print('nested=', nested, 'rand', blocksize, sum(reldiffs)/len(reldiffs))
 
@@ -1782,16 +1785,16 @@ values = []
 #values.append((batch_size, seqdim, 1536, 4*1536))
 #values.append((batch_size, seqdim, 2048, 4*2048))
 #values.append((batch_size, seqdim, 2560, 4*2560))
-values.append((batch_size, seqdim, 4096, 4*4096))
-values.append((batch_size, seqdim, 5120, 4*5120))
+#values.append((batch_size, seqdim, 4096, 4*4096))
+#values.append((batch_size, seqdim, 5120, 4*5120))
 values.append((batch_size, seqdim, 6656, 4*6656))
-values.append((batch_size, seqdim, 8192, 4*8192))
+#values.append((batch_size, seqdim, 8192, 4*8192))
 #values.append((batch_size, seqdim, 5140, 4*5140))
 #values.append((batch_size, seqdim, 12288, 4*12288))
 names = ["batch_{}_seq_{}_model_{}_hidden_{}".format(*vals) for vals in values]
 @pytest.mark.parametrize("batch, seq, model, hidden", values, ids=names)
 def test_bench_matmul(batch, seq, model, hidden):
-    iters = 80
+    iters = 1000
     formatB = F.get_special_format_str()
 
     A = torch.randn(batch, seq, model, device=DEFAULT_DEVICE).half()
@@ -1801,7 +1804,8 @@ def test_bench_matmul(batch, seq, model, hidden):
     B_fp4, state = F.quantize_fp4(B)
     B_fp4_c, state_c = F.quantize_fp4(B, compress_statistics=True)
 
-    B_nf4, state_nf4= F.quantize_nf4(B)
+    B_nf4, state_nf4 = F.quantize_nf4(B)
+    B_nf4_c, state_nf4_c = F.quantize_nf4(B, compress_statistics=True)
 
     linear8bit = bnb.nn.Linear8bitLt(model, hidden, False, False).cuda().half()
     linear8bit.eval()
@@ -1814,6 +1818,7 @@ def test_bench_matmul(batch, seq, model, hidden):
 
     linear8bit_train = bnb.nn.Linear8bitLt(model, hidden, False).cuda().half()
     linear8bit_train_thresh = bnb.nn.Linear8bitLt(model, hidden, False, threshold=6.0).cuda().half()
+    bnb.matmul_4bit(A, B_nf4.t(), quant_state=state_nf4)
 
     # warmup
     for i in range(iters):
@@ -1828,19 +1833,19 @@ def test_bench_matmul(batch, seq, model, hidden):
     torch.cuda.synchronize()
     print( f"pytorch fp16: [{batch},{seq},{model}], [{model},{hidden}]->[{batch},{seq},{hidden}]: {time.time()-t0:.4f}s" )
 
-    torch.cuda.synchronize()
-    t0 = time.time()
-    for i in range(iters):
-        bnb.matmul_4bit(A, B_fp4.t(), quant_state=state)
-    torch.cuda.synchronize()
-    print( f"bnb fp4: [{batch},{seq},{model}], [{model},{hidden}]->[{batch},{seq},{hidden}]: {time.time()-t0:.4f}s" )
+    #torch.cuda.synchronize()
+    #t0 = time.time()
+    #for i in range(iters):
+    #    bnb.matmul_4bit(A, B_fp4.t(), quant_state=state)
+    #torch.cuda.synchronize()
+    #print( f"bnb fp4: [{batch},{seq},{model}], [{model},{hidden}]->[{batch},{seq},{hidden}]: {time.time()-t0:.4f}s" )
 
-    torch.cuda.synchronize()
-    t0 = time.time()
-    for i in range(iters):
-        bnb.matmul_4bit(A, B_fp4.t(), quant_state=state_c)
-    torch.cuda.synchronize()
-    print( f"bnb fp4 + compressed stats: [{batch},{seq},{model}], [{model},{hidden}]->[{batch},{seq},{hidden}]: {time.time()-t0:.4f}s" )
+    #torch.cuda.synchronize()
+    #t0 = time.time()
+    #for i in range(iters):
+    #    bnb.matmul_4bit(A, B_fp4.t(), quant_state=state_c)
+    #torch.cuda.synchronize()
+    #print( f"bnb fp4 + compressed stats: [{batch},{seq},{model}], [{model},{hidden}]->[{batch},{seq},{hidden}]: {time.time()-t0:.4f}s" )
 
     torch.cuda.synchronize()
     t0 = time.time()
@@ -1848,6 +1853,14 @@ def test_bench_matmul(batch, seq, model, hidden):
         bnb.matmul_4bit(A, B_nf4.t(), quant_state=state_nf4)
     torch.cuda.synchronize()
     print( f"bnb nf4: [{batch},{seq},{model}], [{model},{hidden}]->[{batch},{seq},{hidden}]: {time.time()-t0:.4f}s" )
+
+    torch.cuda.synchronize()
+    t0 = time.time()
+    for i in range(iters):
+        bnb.matmul_4bit(A, B_nf4_c.t(), quant_state=state_nf4_c)
+    torch.cuda.synchronize()
+    print( f"bnb nf4+DQ: [{batch},{seq},{model}], [{model},{hidden}]->[{batch},{seq},{hidden}]: {time.time()-t0:.4f}s" )
+
 
     #torch.cuda.synchronize()
     #t0 = time.time()
@@ -1902,21 +1915,21 @@ def test_bench_matmul(batch, seq, model, hidden):
     #torch.cuda.synchronize()
     #print(f"linear pytorch + nvidia: [{batch},{seq},{model}], [{model},{hidden}]->[{batch},{seq},{hidden}]: {time.time()-t0:.4f}s")
 
-    linear8bit(A)
-    torch.cuda.synchronize()
-    t0 = time.time()
-    for i in range(iters):
-        linear8bit(A)
-    torch.cuda.synchronize()
-    print( f"bnb linear8bitlt (eval): [{batch},{seq},{model}], [{model},{hidden}]->[{batch},{seq},{hidden}]: {time.time()-t0:.4f}s")
+    #linear8bit(A)
+    #torch.cuda.synchronize()
+    #t0 = time.time()
+    #for i in range(iters):
+    #    linear8bit(A)
+    #torch.cuda.synchronize()
+    #print( f"bnb linear8bitlt (eval): [{batch},{seq},{model}], [{model},{hidden}]->[{batch},{seq},{hidden}]: {time.time()-t0:.4f}s")
 
-    linearMixedBit(A)
-    torch.cuda.synchronize()
-    t0 = time.time()
-    for i in range(iters):
-        linearMixedBit(A)
-    torch.cuda.synchronize()
-    print( f"bnb linear8bitlt with threshold (eval): [{batch},{seq},{model}], [{model},{hidden}]->[{batch},{seq},{hidden}]: {time.time()-t0:.4f}s")
+    #linearMixedBit(A)
+    #torch.cuda.synchronize()
+    #t0 = time.time()
+    #for i in range(iters):
+    #    linearMixedBit(A)
+    #torch.cuda.synchronize()
+    #print( f"bnb linear8bitlt with threshold (eval): [{batch},{seq},{model}], [{model},{hidden}]->[{batch},{seq},{hidden}]: {time.time()-t0:.4f}s")
 
     #linear8bit_train(A)
     #torch.cuda.synchronize()
@@ -2222,7 +2235,8 @@ def test_bench_dequantization():
 
 
 
-def test_fp4_quant():
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float16, torch.bfloat16], ids=["fp32", "fp16", "bf16"])
+def test_fp4_quant(dtype):
     vals = list(product([0, 1], repeat=4))
 
     code = {}
@@ -2244,7 +2258,7 @@ def test_fp4_quant():
             result = sign*exp*frac
         code[idx] = result
 
-    A1 = torch.randn(1024, 1024, device=DEFAULT_DEVICE).half()
+    A1 = torch.randn(1024, 1024, device=DEFAULT_DEVICE, dtype=dtype)
     qa, SA = F.quantize_fp4(A1, blocksize=64)
     A2 = F.dequantize_fp4(qa, SA)
 
@@ -2253,7 +2267,7 @@ def test_fp4_quant():
     idx = err > 1.0
     err = err.mean()
 
-
+    assert A2.dtype == dtype
     assert err.item() < 0.1
     assert relerr.item() < 0.28
 
@@ -2265,7 +2279,7 @@ def test_4bit_compressed_stats(quant_type):
         errs1 = []
         errs2 = []
         for i in range(10):
-            A1 = torch.randn(1024, 1024, device=DEFAULT_DEVICE).half()
+            A1 = torch.randn(1024, 1024, device='cuda').half()
             q2, SA2 = F.quantize_4bit(A1, blocksize=blocksize, quant_type=quant_type)
             q3, SA3= F.quantize_4bit(A1, blocksize=blocksize, compress_statistics=True, quant_type=quant_type)
             A2 = F.dequantize_4bit(q2, SA2, quant_type=quant_type)
@@ -2298,7 +2312,8 @@ def test_4bit_compressed_stats(quant_type):
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="this test requires a GPU")
-@pytest.mark.parametrize("quant_type", ['fp4', 'nf4'])
+#@pytest.mark.parametrize("quant_type", ['fp4', 'nf4'])
+@pytest.mark.parametrize("quant_type", ['nf4'])
 def test_bench_4bit_dequant(quant_type):
     blocksize = 256
     a = torch.rand(1024*12*4, 1024*12, device=DEFAULT_DEVICE).half()
@@ -2312,7 +2327,7 @@ def test_bench_4bit_dequant(quant_type):
     #print(max_theoretical_s*1e6)
     b = torch.randn(128, 1024*12, device=DEFAULT_DEVICE).half()
 
-    iters = 5
+    iters = 100
     torch.cuda.synchronize()
     t0 = time.time()
     for i in range(iters):
@@ -2345,139 +2360,93 @@ def test_normal_map_tree():
         print(pivots)
 
 
-#@pytest.mark.parametrize("dtype", [torch.float32, torch.float16], ids=['fp32', 'fp16'])
-@pytest.mark.parametrize("dtype", [torch.float16], ids=['fp16'])
-def test_cutlass3_gemm(dtype):
-    debug = True
-    #for dim in [32, 64, 128, 256, 512, 1024, 2048, 4096]:
-    #for dim in [4096, 5120, 6656, 8192]:
-    for dim in [4096]:
-    #for dim in [128+1]:
+@pytest.mark.parametrize("double_quant", [True, False], ids=['DQ_True', 'DQ_False'])
+@pytest.mark.parametrize("storage_type", ['nf4', 'fp4'], ids=['nf4', 'fp4'])
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32], ids=['fp16', 'bf16', 'fp32'])
+def test_gemv_4bit(dtype, storage_type, double_quant):
+    print('')
+    for dim in [128, 256, 512, 1024, 2048, 4096]:
+    #for dim in [4*1024]:
+    #for dim in [1*16]:
         errs = []
         relerrs = []
         max_err = 0
         max_relerr = 0
+
         for i in range(100):
-            A = torch.randn(1, dim, dtype=dtype, device=DEFAULT_DEVICE)
-            B = torch.randn(4*dim, dim+0, dtype=dtype, device=DEFAULT_DEVICE)/math.sqrt(dim)
-            #B = torch.randn(1, dim, dtype=dtype, device=DEFAULT_DEVICE)/math.sqrt(dim)
-
-            #print('')
-            #print(A)
-            #print(B.t())
-            #A[:, :-1] = 0
-            #B[:, :-1] = 0
-
-
-            C1 = torch.matmul(A, B.t())
-            C2 = F.cutlass3_gemm(A, B.t())
-
-            # tensor cores are non-deterministic
-            # so we need to analyze errors around the mean
-            # to test our implementation
-            err = torch.abs(C1-C2)
-            mag = torch.abs(C1)+1e-8
-            relerr = err/mag
-            max_err = max(err.max(), max_err)
-            max_relerr = max(relerr.max(), max_relerr)
-            err = err.mean().item()
-            relerr = relerr.mean().item()
-
-            errs.append(err)
-            relerrs.append(relerr)
-
-            #if not debug and err/torch.abs(C1).mean() > 5e-5 or err > 3.2e-5:
-            #    print('')
-            #    print(i, err, relerr)
-            #    print(A.flatten()[-6:])
-            #    print(B.flatten()[-6:])
-            #    out = A.flatten()[-6:]*B.flatten()[-6:]
-            #    print(out)
-            #    print(out[:-1].sum())
-            #    print('='*80)
-            #    print(C1.flatten()[-6:])
-            #    print(C2.flatten()[-6:])
-            #    #assert False, 'ERROR'
-
-            c = int(C1.numel()*0.0014*(dim/256))+1
-
-            c = assert_all_approx_close(C1, C2, 1e-5, 0.01, count=c, throw=not debug)
-            #print(c/math.sqrt(dim))
-        print('')
-        print(dim, sum(errs)/len(errs)/math.sqrt(dim))
-        print(dim, sum(relerrs)/len(relerrs)/math.sqrt(dim))
-        print(dim, (max_err.item(), max_relerr.item()))
-
-#@pytest.mark.parametrize("dtype", [torch.float32, torch.float16], ids=['fp32', 'fp16'])
-@pytest.mark.parametrize("dtype", [torch.float16], ids=['fp16'])
-def test_gemm_4bit(dtype):
-    #for dim in [32, 64, 128, 256, 512, 1024, 2048, 4096]:
-    #for dim in [4096, 5120, 6656, 8192]:
-    #for dim in [32]:
-    for dim in [4096]:
-        errs = []
-        relerrs = []
-        max_err = 0
-        max_relerr = 0
-        for i in range(1):
             #A = torch.rand(2, 4092, dtype=dtype, device=DEFAULT_DEVICE)
             #B = torch.rand(4*4092, 4092, dtype=dtype, device=DEFAULT_DEVICE)
             #A = torch.rand(1, 4096, dtype=dtype, device=DEFAULT_DEVICE)
             #B = torch.rand(4*4096, 4096, dtype=dtype, device=DEFAULT_DEVICE)
-            A = torch.randn(1, dim+0, dtype=dtype, device=DEFAULT_DEVICE)
-            B = torch.randn(4*dim, dim+0, dtype=dtype, device=DEFAULT_DEVICE)/math.sqrt(dim)
+            A = torch.randn(1, dim, dtype=dtype, device=DEFAULT_DEVICE)
+            #B = torch.randn(4, dim, dtype=dtype, device=DEFAULT_DEVICE)/math.sqrt(dim)
+            B = torch.randn(dim*4, dim, dtype=dtype, device=DEFAULT_DEVICE)/math.sqrt(dim)
 
             #print('')
             #print(A)
             #print(B.t())
             #A[:, :-1] = 0
             #B[:, :-1] = 0
+            #A.flatten()[:-1] = 0
+            #B.flatten()[:-1] = 0
 
-            qB, state = F.quantize_nf4(B)
-            F.dequantize_nf4(qB, state)
+            qB, state = F.quantize_4bit(B, quant_type=storage_type, compress_statistics=double_quant)
+            #F.dequantize_4bit(qB, state)
 
             C3 = torch.matmul(A, B.t())
-            C2 = F.cutlass3_gemm(A, qB.t(), state=state)
+            C2 = F.gemv_4bit(A, qB.t(), state=state)
+            A.requires_grad = True
             C1 = bnb.matmul_4bit(A, qB.t(), state)
-            C2 = F.cutlass3_gemm(A, qB.t(), state=state)
 
-            print(C1.shape, C2.shape)
+            #print(state)
+            #print(qB)
+
+            #print('')
+            #print(A)
+            #print(B)
+            #print('='*89)
+            #print(C3)
+
+            #print(C1.shape, C2.shape)
 
             # tensor cores are non-deterministic
             # so we need to analyze errors around the mean
             # to test our implementation
-            err = torch.abs(C1-C2)
-            mag = torch.abs(C1)+1e-8
+            err = torch.abs(C1-C2).float()
+            mag = torch.abs(C1).float()+1e-5
             relerr = err/mag
             max_err = max(err.max(), max_err)
             max_relerr = max(relerr.max(), max_relerr)
             err = err.mean().item()
             relerr = relerr.mean().item()
+            #print(err)
 
             errs.append(err)
             relerrs.append(relerr)
 
-            if err/torch.abs(C1).mean() > 5e-5 or err > 3.2e-5:
-                print('')
-                print(i, err, relerr)
-                print(A.flatten()[-6:])
-                print(B.flatten()[-6:])
-                out = A.flatten()[-6:]*B.flatten()[-6:]
-                print(out)
-                print(out[:-1].sum())
-                print('='*80)
-                print(C1.flatten()[-6:])
-                print(C2.flatten()[-6:])
-                #assert False, 'ERROR'
-
             c = int(C1.numel()*0.0014*(dim/256))+1
 
             c = assert_all_approx_close(C1, C2, 1e-5, 0.01, count=c, throw=False)
-            #print(c/math.sqrt(dim))
-        print('')
-        print(dim, sum(errs)/len(errs)/math.sqrt(dim))
-        print(dim, sum(relerrs)/len(relerrs)/math.sqrt(dim))
-        print(dim, (max_err.item(), max_relerr.item()))
+        #print('')
+        #print(dim, sum(errs)/len(errs)/math.sqrt(dim))
+        #print(dim, sum(relerrs)/len(relerrs)/math.sqrt(dim))
+        #print(dim, (max_err.item(), max_relerr.item()))
+        print(C1.flatten()[-20:])
+        print(C2.flatten()[-20:])
+        #print(C1.flatten())
+        #print(C2.flatten())
+        #print(C3.flatten()[-20:])
+        print(sum(errs)/len(errs)/math.sqrt(dim) , dim)
+        print(sum(relerrs)/len(relerrs)/math.sqrt(dim) , dim)
+        if dtype == torch.float16:
+            assert sum(errs)/len(errs)/math.sqrt(dim) < 5e-5
+            assert sum(relerrs)/len(relerrs)/math.sqrt(dim) < 0.0005
+        elif dtype == torch.float32:
+            assert sum(errs)/len(errs)/math.sqrt(dim) < 5e-8
+            assert sum(relerrs)/len(relerrs)/math.sqrt(dim) < 1e-7
+        elif dtype == torch.bfloat16:
+            assert sum(errs)/len(errs)/math.sqrt(dim) < 3e-4
+            assert sum(relerrs)/len(relerrs)/math.sqrt(dim) < 0.003
 
 @pytest.mark.skip("Row scale has some bugs for ampere")
 def test_managed():

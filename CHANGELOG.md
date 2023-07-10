@@ -247,3 +247,14 @@ Deprecated:
  - Kepler binaries (GTX 700s and Tesla K40/K80) are not longer provided via pip and need to be compiled from source. Kepler support might be fully removed in the future.
 
 
+### 0.40.0
+
+Features:
+ - Added 4-bit inference kernels for batch size=1. Currently support are the NF4, FP4 data types.
+ - Added support for quantizations of bfloat16 input data.
+
+Bug fixes:
+ - Added `device` variable for bitsandbytes layers to be compatible with PyTorch layers.
+
+Deprecated:
+ - Binaries for CUDA 11.2, 11.3, 11.6 no longer ship with `pip install bitsandbytes` and need to be compiled from source.
