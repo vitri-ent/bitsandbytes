@@ -258,3 +258,19 @@ Bug fixes:
 
 Deprecated:
  - Binaries for CUDA 11.2, 11.6 no longer ship with `pip install bitsandbytes` and need to be compiled from source.
+
+
+### 0.40.1
+
+Features:
+ - Added precompiled CUDA 11.8 binaries to support H100 GPUs without compilation #571
+ - CUDA SETUP now no longer looks for libcuda and libcudart and relies PyTorch CUDA libraries. To manually override this behavior see: how_to_use_nonpytorch_cuda.md.
+
+Bug fixes:
+ - Fixed a bug where the default type of absmax was undefined which leads to errors if the default type is different than torch.float32. # 553
+ - Fixed a missing scipy dependency in requirements.txt. #544
+ - Fixed a bug, where a view operation could cause an error in 8-bit layers.
+
+Documentation:
+ - Improved documentation for GPUs that do not support 8-bit matmul. #529
+ - Added description and pointers for the NF4 data type. #543
