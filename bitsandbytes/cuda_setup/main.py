@@ -21,6 +21,7 @@ import os
 import errno
 import torch
 import platform
+import site
 from warnings import warn
 from itertools import product
 
@@ -105,18 +106,18 @@ class CUDASetup:
             self.error = False
 
     def manual_override(self):
-    if torch.cuda.is_available():
-        if 'CUDA_VERSION' in os.environ:
-            if len(os.environ['CUDA_VERSION']) > 0:
-                warn((f'\n\n{"="*80}\n'
-                      'WARNING: Manual override via CUDA_VERSION env variable detected!\n'
-                      'CUDA_VERSION=XXX can be used to load a bitsandbytes version that is different from the PyTorch CUDA version.\n'
-                      f'If this was unintended set the CUDA_VERSION variable to an empty string: {"set CUDA_VERSION=" if IS_WINDOWS_PLATFORM else "export CUDA_VERSION="}\n'
-                      'If you use the manual override make sure the right libcudart.so is in your LD_LIBRARY_PATH\n' if not IS_WINDOWS_PLATFORM
-                      'For example by adding the following to your .bashrc: export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:<path_to_cuda_dir/lib64\n' if not IS_WINDOWS_PLATFORM
-                      f'Loading CUDA version: CUDA_VERSION={os.environ["CUDA_VERSION"]}'
-                      f'\n{"="*80}\n\n'))
-                self.binary_name = self.binary_name[:-6] + f'{os.environ["CUDA_VERSION"]}' + SHARED_LIB_EXTENSION
+        if torch.cuda.is_available():
+            if 'CUDA_VERSION' in os.environ:
+                if len(os.environ['CUDA_VERSION']) > 0:
+                    warn((f'\n\n{"="*80}\n'
+                          'WARNING: Manual override via CUDA_VERSION env variable detected!\n'
+                          'CUDA_VERSION=XXX can be used to load a bitsandbytes version that is different from the PyTorch CUDA version.\n'
+                          f'If this was unintended set the CUDA_VERSION variable to an empty string: {"set CUDA_VERSION=" if IS_WINDOWS_PLATFORM else "export CUDA_VERSION="}\n'
+                          'If you use the manual override make sure the right libcudart.so is in your LD_LIBRARY_PATH\n' if not IS_WINDOWS_PLATFORM else ''
+                          'For example by adding the following to your .bashrc: export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:<path_to_cuda_dir/lib64\n' if not IS_WINDOWS_PLATFORM else ''
+                          f'Loading CUDA version: CUDA_VERSION={os.environ["CUDA_VERSION"]}'
+                          f'\n{"="*80}\n\n'))
+                    self.binary_name = self.binary_name[:-6] + f'{os.environ["CUDA_VERSION"]}' + SHARED_LIB_EXTENSION
 
     def run_cuda_setup(self):
         self.initialized = True
@@ -245,10 +246,10 @@ def warn_in_case_of_duplicates(results_paths: Set[Path]) -> None:
             "but this might missmatch with the CUDA version that is needed for bitsandbytes."
             "To override this behavior set the CUDA_VERSION=<version string, e.g. 122> environmental variable"
             "For example, if you want to use the CUDA version 122:"
-            "CUDA_VERSION=122 python ..." if not IS_WINDOWS_PLATFORM else "setCUDA_VERSION=122\npython ..."
-            "OR set the environmental variable in your .bashrc: export CUDA_VERSION=122" if not IS_WINDOWS_PLATFORM
-            "In the case of a manual override, make sure you set the LD_LIBRARY_PATH, e.g." if not IS_WINDOWS_PLATFORM
-            "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-11.2" if not IS_WINDOWS_PLATFORM)
+            "CUDA_VERSION=122 python ..." if not IS_WINDOWS_PLATFORM else "set CUDA_VERSION=122\npython ..."
+            "OR set the environmental variable in your .bashrc: export CUDA_VERSION=122" if not IS_WINDOWS_PLATFORM else ''
+            "In the case of a manual override, make sure you set the LD_LIBRARY_PATH, e.g." if not IS_WINDOWS_PLATFORM else ''
+            "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-11.2" if not IS_WINDOWS_PLATFORM else '')
         CUDASetup.get_instance().add_log_entry(warning_msg, is_warning=True)
 
 
@@ -284,6 +285,21 @@ def determine_cuda_runtime_lib_path() -> Union[Path, None]:
         if conda_cuda_libs:
             cuda_runtime_libs.update(conda_cuda_libs)
         CUDASetup.get_instance().add_log_entry(f'{candidate_env_vars["CONDA_PREFIX"]} did not contain '
+            f'{CUDA_RUNTIME_LIBS} as expected! Searching further paths...', is_warning=True)
+
+    for sitedir in site.getsitepackages():
+        if "site-packages" in sitedir:
+                site_packages_path = sitedir
+                break
+    if site_packages_path:
+        torch_libs_path = os.path.join(site_packages_path, "torch", "lib")
+        
+        torch_cuda_libs = find_cuda_lib_in(str(torch_libs_path))
+        warn_in_case_of_duplicates(torch_cuda_libs)
+
+        if torch_cuda_libs:
+            cuda_runtime_libs.update(torch_cuda_libs)
+        CUDASetup.get_instance().add_log_entry(f'{torch_cuda_libs} did not contain '
             f'{CUDA_RUNTIME_LIBS} as expected! Searching further paths...', is_warning=True)
         
     if "CUDA_PATH" in candidate_env_vars:
@@ -357,9 +373,7 @@ def determine_cuda_runtime_lib_path() -> Union[Path, None]:
 
     if len(cuda_runtime_libs) == 0:
         CUDASetup.get_instance().add_log_entry(f'CUDA_SETUP: WARNING! {CUDA_RUNTIME_LIBS} not found in any environmental path. Searching in backup paths...')
-        for backup_path in backup_paths:
-            if Path(backup_path).exists():
-                cuda_runtime_libs.update(Path(backup_path))
+        cuda_runtime_libs.update([os.path.normpath(os.path.realpath(backup_path)) for backup_path in backup_paths if os.path.lexists(backup_path)])
 
     warn_in_case_of_duplicates(cuda_runtime_libs)
     
@@ -367,6 +381,17 @@ def determine_cuda_runtime_lib_path() -> Union[Path, None]:
     cuda_setup.add_log_entry(f'DEBUG: Possible options found for libcudart.so: {cuda_runtime_libs}')
 
     return next(iter(cuda_runtime_libs)) if cuda_runtime_libs else None
+
+
+def check_cuda_result(cuda, result_val):
+    # 3. Check for CUDA errors
+    if result_val != 0:
+        error_str = ct.c_char_p()
+        cuda.cuGetErrorString(result_val, ct.byref(error_str))
+        if error_str.value is not None:
+            CUDASetup.get_instance().add_log_entry(f"CUDA exception! Error code: {error_str.value.decode()}")
+        else:
+            CUDASetup.get_instance().add_log_entry(f"Unknown CUDA exception! Please check your CUDA install. It might also be that your GPU is too old.")
 
 
 # https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART____VERSION.html#group__CUDART____VERSION
@@ -377,6 +402,18 @@ def get_cuda_version():
         CUDASetup.get_instance().add_log_entry('CUDA SETUP: CUDA version lower than 11 are currently not supported for LLM.int8(). You will be only to use 8-bit optimizers and quantization routines!!')
 
     return f'{major}{minor}'
+
+
+def get_cuda_lib_handle():
+    # 1. find libcuda.so library (GPU driver) (/usr/lib)
+    try:
+        cuda = ct.CDLL(CUDA_SHARED_LIB_NAME)
+    except OSError:
+        CUDASetup.get_instance().add_log_entry(f'CUDA SETUP: WARNING! {CUDA_SHARED_LIB_NAME} not found! Do you have a CUDA driver installed? If you are on a cluster, make sure you are on a CUDA machine!')
+        return None
+    check_cuda_result(cuda, cuda.cuInit(0))
+
+    return cuda
 
 
 def get_compute_capabilities():

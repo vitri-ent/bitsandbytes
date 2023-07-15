@@ -1,9 +1,8 @@
-# 11.6
 #Remove-Item -Recurse -Force ./build
-Remove-Item -Recurse -Force ./build_11.6_0
-Remove-Item -Recurse -Force ./build_11.6_1
-Remove-Item -Recurse -Force ./build_11.7_0
-Remove-Item -Recurse -Force ./build_11.7_1
+Remove-Item -Recurse -Force ./build_11.7_0 -ea 'SilentlyContinue'
+Remove-Item -Recurse -Force ./build_11.7_1 -ea 'SilentlyContinue'
+Remove-Item -Recurse -Force ./build_11.8_0 -ea 'SilentlyContinue'
+Remove-Item -Recurse -Force ./build_11.8_1 -ea 'SilentlyContinue'
 
 $Funcs = {
     function configure([string]$cuda_version, [string]$no_cuda_blast)
@@ -22,10 +21,10 @@ $Funcs = {
 }
 
 
-$j1 = Start-Job -ScriptBlock { configure "11.6" "0"; build_with_cpu "11.6" "0"} -InitializationScript $Funcs
-$j2 = Start-Job -ScriptBlock { configure "11.6" "1"; build "11.6" "1" } -InitializationScript $Funcs
-$j3 = Start-Job -ScriptBlock { configure "11.7" "0"; build "11.7" "0" } -InitializationScript $Funcs
-$j4 = Start-Job -ScriptBlock { configure "11.7" "1"; build "11.7" "1" } -InitializationScript $Funcs
+$j1 = Start-Job -ScriptBlock { configure "11.7" "0"; build_with_cpu "11.7" "0"} -InitializationScript $Funcs
+$j2 = Start-Job -ScriptBlock { configure "11.7" "1"; build "11.7" "1" } -InitializationScript $Funcs
+$j3 = Start-Job -ScriptBlock { configure "11.8" "0"; build "11.8" "0" } -InitializationScript $Funcs
+$j4 = Start-Job -ScriptBlock { configure "11.8" "1"; build "11.8" "1" } -InitializationScript $Funcs
 
 Get-Job | Wait-Job
 
@@ -33,5 +32,3 @@ Receive-Job $j1
 Receive-Job $j2
 Receive-Job $j3
 Receive-Job $j4
-
-

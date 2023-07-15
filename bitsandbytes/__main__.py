@@ -3,6 +3,7 @@ import sys
 import shlex
 import subprocess
 import platform
+import site
 
 from warnings import warn
 from typing import Tuple
@@ -51,6 +52,16 @@ def generate_bug_report_information():
     if 'CONDA_PREFIX' in os.environ:
         paths = find_file_recursive(os.environ['CONDA_PREFIX'], f'*cuda*{SHARED_LIB_EXTENSION}')
         print_header("ANACONDA CUDA PATHS")
+        print(paths)
+        print('')
+    for sitedir in site.getsitepackages():
+        if "site-packages" in sitedir:
+                site_packages_path = sitedir
+                break
+    if site_packages_path:
+        torch_libs_path = os.path.join(site_packages_path, "torch", "lib")
+        paths = find_file_recursive(torch_libs_path, f'*cuda*{SHARED_LIB_EXTENSION}')
+        print_header("PYTORCH CUDA PATHS")
         print(paths)
         print('')
     if 'CUDA_HOME' in os.environ:
@@ -117,7 +128,7 @@ from .cuda_setup.main import get_compute_capabilities, get_cuda_lib_handle
 print_header("OTHER")
 print(f"COMPILED_WITH_CUDA = {COMPILED_WITH_CUDA}")
 cuda = get_cuda_lib_handle()
-print(f"COMPUTE_CAPABILITIES_PER_GPU = {get_compute_capabilities(cuda)}")
+print(f"COMPUTE_CAPABILITIES_PER_GPU = {get_compute_capabilities()}")
 print_header("")
 print_header("DEBUG INFO END")
 print_header("")
