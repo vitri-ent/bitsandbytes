@@ -295,13 +295,15 @@ def determine_cuda_runtime_lib_path() -> Union[Path, None]:
     if site_packages_path:
         torch_libs_path = os.path.join(site_packages_path, "torch", "lib")
         
-        torch_cuda_libs = find_cuda_lib_in(str(torch_libs_path))
-        warn_in_case_of_duplicates(torch_cuda_libs)
+        if os.path.isdir(torch_libs_path):
+            torch_cuda_libs = find_cuda_lib_in(str(torch_libs_path))
+            warn_in_case_of_duplicates(torch_cuda_libs)
 
-        if torch_cuda_libs:
-            cuda_runtime_libs.update(torch_cuda_libs)
-        CUDASetup.get_instance().add_log_entry(f'{torch_cuda_libs} did not contain '
-            f'{CUDA_RUNTIME_LIBS} as expected! Searching further paths...', is_warning=True)
+            if torch_cuda_libs:
+                cuda_runtime_libs.update(torch_cuda_libs)
+
+            CUDASetup.get_instance().add_log_entry(f'{torch_cuda_libs} did not contain '
+                f'{CUDA_RUNTIME_LIBS} as expected! Searching further paths...', is_warning=True)
         
     if "CUDA_PATH" in candidate_env_vars:
         ld_cuda_libs_path = Path(candidate_env_vars["CUDA_PATH"]) / "bin"

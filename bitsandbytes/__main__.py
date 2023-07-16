@@ -49,7 +49,7 @@ def generate_bug_report_information():
     print_header("")
     print('')
     
-    if 'CONDA_PREFIX' in os.environ:
+    if isdir(os.environ.get('CONDA_PREFIX', False)):
         paths = find_file_recursive(os.environ['CONDA_PREFIX'], f'*cuda*{SHARED_LIB_EXTENSION}')
         print_header("ANACONDA CUDA PATHS")
         print(paths)
@@ -60,16 +60,17 @@ def generate_bug_report_information():
                 break
     if site_packages_path:
         torch_libs_path = os.path.join(site_packages_path, "torch", "lib")
-        paths = find_file_recursive(torch_libs_path, f'*cuda*{SHARED_LIB_EXTENSION}')
-        print_header("PYTORCH CUDA PATHS")
-        print(paths)
-        print('')
-    if 'CUDA_HOME' in os.environ:
+        if isdir(torch_libs_path):
+            paths = find_file_recursive(torch_libs_path, f'*cuda*{SHARED_LIB_EXTENSION}')
+            print_header("PYTORCH CUDA PATHS")
+            print(paths)
+            print('')
+    if isdir(os.environ.get('CUDA_HOME', False)):
         paths = find_file_recursive(os.environ['CONDA_PREFIX'], f'*cuda*{SHARED_LIB_EXTENSION}')
         print_header("CUDA_HOME CUDA PATHS")
         print(paths)
         print('')
-    elif 'CUDA_PATH' in os.environ:
+    elif isdir(os.environ.get('CUDA_PATH', False)):
         paths = find_file_recursive(os.environ['CONDA_PREFIX'], f'*cuda*{SHARED_LIB_EXTENSION}')
         print_header("CUDA_PATH CUDA PATHS")
         print(paths)
@@ -86,7 +87,7 @@ def generate_bug_report_information():
         print(paths)
         print('')
 
-    if 'LD_LIBRARY_PATH' in os.environ:
+    if isdir(os.environ.get('LD_LIBRARY_PATH', False)):
         print_header("LD_LIBRARY CUDA PATHS")
         lib_path = os.environ['LD_LIBRARY_PATH'].strip()
         for path in set(lib_path.split(':' if not IS_WINDOWS_PLATFORM else ';')):
