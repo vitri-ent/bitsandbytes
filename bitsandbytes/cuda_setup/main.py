@@ -93,7 +93,7 @@ class CUDASetup:
             make_cmd += '_nomatmul'
 
         self.add_log_entry('CUDA SETUP: Something unexpected happened. Please compile from source:')
-        self.add_log_entry('git clone git@github.com:TimDettmers/bitsandbytes.git')
+        self.add_log_entry('git clone https://github.com/TimDettmers/bitsandbytes.git')
         self.add_log_entry('cd bitsandbytes')
         self.add_log_entry(make_cmd)
         self.add_log_entry('python setup.py install')
@@ -206,6 +206,8 @@ def remove_non_existent_dirs(candidate_paths: Set[Path]) -> Set[Path]:
         except OSError as exc:
             if exc.errno != errno.ENAMETOOLONG:
                 raise exc
+        except PermissionError as pex:
+            pass
 
     non_existent_directories: Set[Path] = candidate_paths - existent_directories
     if non_existent_directories:
