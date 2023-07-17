@@ -145,6 +145,7 @@ class CUBLAS_Context:
                 self.context[device.index] = ct.c_void_p(lib.get_context())
         return self.context[device.index]
 
+
 class Cusparse_Context:
     _instance = None
 
@@ -685,7 +686,6 @@ def dequantize_blockwise(
         if "dynamic" not in name2qmap:
             name2qmap["dynamic"] = create_dynamic_map().to(A.device)
         code = name2qmap["dynamic"]
-
 
     if quant_state is None:
        quant_state = (absmax, code, blocksize, False, torch.float32, None, None)

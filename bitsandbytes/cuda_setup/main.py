@@ -306,41 +306,41 @@ def determine_cuda_runtime_lib_path() -> Union[Path, None]:
                 f'{CUDA_RUNTIME_LIBS} as expected! Searching further paths...', is_warning=True)
         
     if "CUDA_PATH" in candidate_env_vars:
-        ld_cuda_libs_path = Path(candidate_env_vars["CUDA_PATH"]) / "bin"
+        win_toolkit_libs_path = Path(candidate_env_vars["CUDA_PATH"]) / "bin"
     
-        lib_ld_cuda_libs = find_cuda_lib_in(str(ld_cuda_libs_path))
-        warn_in_case_of_duplicates(lib_ld_cuda_libs)
+        win_toolkit_cuda_libs = find_cuda_lib_in(str(win_toolkit_libs_path))
+        warn_in_case_of_duplicates(win_toolkit_cuda_libs)
 
-        if lib_ld_cuda_libs:
-            cuda_runtime_libs.update(conda_cuda_libs)
+        if win_toolkit_cuda_libs:
+            cuda_runtime_libs.update(win_toolkit_cuda_libs)
 
-        ld_cuda_libs_path = Path(candidate_env_vars["CUDA_PATH"]) / "lib"
+        win_toolkit_libs_path = Path(candidate_env_vars["CUDA_PATH"]) / "lib"
     
-        lib_ld_cuda_libs = find_cuda_lib_in(str(ld_cuda_libs_path))
-        warn_in_case_of_duplicates(lib_ld_cuda_libs)
+        win_toolkit_cuda_libs = find_cuda_lib_in(str(win_toolkit_libs_path))
+        warn_in_case_of_duplicates(win_toolkit_cuda_libs)
 
-        if lib_ld_cuda_libs:
-            cuda_runtime_libs.update(conda_cuda_libs)
+        if win_toolkit_cuda_libs:
+            cuda_runtime_libs.update(win_toolkit_cuda_libs)
 
         CUDASetup.get_instance().add_log_entry(f'{candidate_env_vars["CUDA_PATH"]} did not contain '
             f'{CUDA_RUNTIME_LIBS} as expected! Searching further paths...', is_warning=True)
         
     if "CUDA_HOME" in candidate_env_vars:
-        ld_cuda_libs_path = Path(candidate_env_vars["CUDA_HOME"]) / "bin"
+        lin_toolkit_libs_path = Path(candidate_env_vars["CUDA_HOME"]) / "bin"
     
-        lib_ld_cuda_libs = find_cuda_lib_in(str(ld_cuda_libs_path))
-        warn_in_case_of_duplicates(lib_ld_cuda_libs)
+        lin_toolkit_cuda_libs = find_cuda_lib_in(str(lin_toolkit_libs_path))
+        warn_in_case_of_duplicates(lin_toolkit_cuda_libs)
 
-        if lib_ld_cuda_libs:
-            cuda_runtime_libs.update(conda_cuda_libs)
+        if lin_toolkit_cuda_libs:
+            cuda_runtime_libs.update(lin_toolkit_cuda_libs)
         
-        ld_cuda_libs_path = Path(candidate_env_vars["CUDA_HOME"]) / "lib"
+        lin_toolkit_libs_path = Path(candidate_env_vars["CUDA_HOME"]) / "lib"
     
-        lib_ld_cuda_libs = find_cuda_lib_in(str(ld_cuda_libs_path))
-        warn_in_case_of_duplicates(lib_ld_cuda_libs)
+        lin_toolkit_cuda_libs = find_cuda_lib_in(str(lin_toolkit_libs_path))
+        warn_in_case_of_duplicates(lin_toolkit_cuda_libs)
 
-        if lib_ld_cuda_libs:
-            cuda_runtime_libs.update(conda_cuda_libs)
+        if lin_toolkit_cuda_libs:
+            cuda_runtime_libs.update(lin_toolkit_cuda_libs)
 
         CUDASetup.get_instance().add_log_entry(f'{candidate_env_vars["CUDA_HOME"]} did not contain '
             f'{CUDA_RUNTIME_LIBS} as expected! Searching further paths...', is_warning=True)
@@ -356,11 +356,11 @@ def determine_cuda_runtime_lib_path() -> Union[Path, None]:
             f'{CUDA_RUNTIME_LIBS} as expected! Searching further paths...', is_warning=True)
         
     if "PATH" in candidate_env_vars:
-        lib_ld_cuda_libs = find_cuda_lib_in(candidate_env_vars["PATH"])
-        warn_in_case_of_duplicates(lib_ld_cuda_libs)
+        lib_path_cuda_libs = find_cuda_lib_in(candidate_env_vars["PATH"])
+        warn_in_case_of_duplicates(lib_path_cuda_libs)
 
-        if lib_ld_cuda_libs:
-            cuda_runtime_libs.update(conda_cuda_libs)
+        if lib_path_cuda_libs:
+            cuda_runtime_libs.update(lib_path_cuda_libs)
 
         CUDASetup.get_instance().add_log_entry(f'{candidate_env_vars["PATH"]} did not contain '
             f'{CUDA_RUNTIME_LIBS} as expected! Searching further paths...', is_warning=True)
@@ -386,17 +386,6 @@ def determine_cuda_runtime_lib_path() -> Union[Path, None]:
     return next(iter(cuda_runtime_libs)) if cuda_runtime_libs else None
 
 
-def check_cuda_result(cuda, result_val):
-    # 3. Check for CUDA errors
-    if result_val != 0:
-        error_str = ct.c_char_p()
-        cuda.cuGetErrorString(result_val, ct.byref(error_str))
-        if error_str.value is not None:
-            CUDASetup.get_instance().add_log_entry(f"CUDA exception! Error code: {error_str.value.decode()}")
-        else:
-            CUDASetup.get_instance().add_log_entry(f"Unknown CUDA exception! Please check your CUDA install. It might also be that your GPU is too old.")
-
-
 # https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART____VERSION.html#group__CUDART____VERSION
 def get_cuda_version():
     major, minor = map(int, torch.version.cuda.split("."))
@@ -406,24 +395,12 @@ def get_cuda_version():
 
     return f'{major}{minor}'
 
-
-def get_cuda_lib_handle():
-    # 1. find libcuda.so library (GPU driver) (/usr/lib)
-    try:
-        cuda = ct.CDLL(CUDA_SHARED_LIB_NAME)
-    except OSError:
-        CUDASetup.get_instance().add_log_entry(f'CUDA SETUP: WARNING! {CUDA_SHARED_LIB_NAME} not found! Do you have a CUDA driver installed? If you are on a cluster, make sure you are on a CUDA machine!')
-        return None
-    check_cuda_result(cuda, cuda.cuInit(0))
-
-    return cuda
-
-
 def get_compute_capabilities():
     ccs = []
     for i in range(torch.cuda.device_count()):
         cc_major, cc_minor = torch.cuda.get_device_capability(torch.cuda.device(i))
         ccs.append(f"{cc_major}.{cc_minor}")
+
     return ccs
 
 
@@ -446,6 +423,7 @@ def evaluate_cuda_setup():
     cuda_setup.add_log_entry(f"CUDA SETUP: PyTorch settings found: CUDA_VERSION={cuda_version_string}, Highest Compute Capability: {cc}.")
     cuda_setup.add_log_entry(f"CUDA SETUP: To manually override the PyTorch CUDA version please see:"
                              "https://github.com/TimDettmers/bitsandbytes/blob/main/how_to_use_nonpytorch_cuda.md")
+
 
     # 7.5 is the minimum CC vor cublaslt
     has_cublaslt = is_cublasLt_compatible(cc)
