@@ -130,3 +130,28 @@ Bug fixes:
  - fixed a bug where too long directory names would crash the CUDA SETUP #35 (thank you @tomaarsen)
  - fixed a bug where CPU installations on Colab would run into an error  #34 (thank you @tomaarsen)
  - fixed an issue where the default CUDA version with fast-DreamBooth was not supported #52
+
+### 0.35.1
+
+Features:
+ - Added CUDA instruction generator to fix some installations.
+
+Bug fixes:
+ - Fixed a problem where warning messages would be displayed even though everything worked correctly.
+
+
+### 0.35.2
+
+Bug fixes:
+ - Fixed a bug where the CUDA setup failed due to a wrong function call.
+
+### 0.35.3
+
+Bug fixes:
+ - Fixed a bug in the CUDA Setup which led to an incomprehensible error if no GPU was detected.
+
+### 0.35.4
+
+Bug fixes:
+ - Fixed a bug in the CUDA Setup failed with the cuda runtime was found, but not the cuda library.
+ - Fixed a bug where not finding the cuda runtime led to an incomprehensible error.
