@@ -1,15 +1,24 @@
 import errno
+import platform
+import site
+import os
 from pathlib import Path
 from typing import Set, Union
 from warnings import warn
 
 from .env_vars import get_potentially_lib_path_containing_env_vars
 
-CUDA_RUNTIME_LIB: str = "libcudart.so"
+
+IS_WINDOWS_PLATFORM: bool = (platform.system()=="Windows")
+PATH_COLLECTION_SEPARATOR: str = ":" if not IS_WINDOWS_PLATFORM else ";"
+CUDA_SHARED_LIB_NAME: str = "libcuda.so" if not IS_WINDOWS_PLATFORM else f"{os.environ['SystemRoot']}\\System32\\nvcuda.dll"
+SHARED_LIB_EXTENSION: str = ".so" if not IS_WINDOWS_PLATFORM else ".dll"
+CUDA_RUNTIME_LIB: str = "libcudart.so" if not IS_WINDOWS_PLATFORM else "cudart64_110.dll"
+backup_path = os.path.join(os.environ.get("CUDA_PATH", os.getcwd()), "bin", CUDA_RUNTIME_LIB) if IS_WINDOWS_PLATFORM else '/usr/local/cuda/lib64'
 
 
 def extract_candidate_paths(paths_list_candidate: str) -> Set[Path]:
-    return {Path(ld_path) for ld_path in paths_list_candidate.split(":") if ld_path}
+    return {Path(ld_path) for ld_path in paths_list_candidate.split(PATH_COLLECTION_SEPARATOR) if ld_path}
 
 
 def remove_non_existent_dirs(candidate_paths: Set[Path]) -> Set[Path]:
@@ -82,6 +91,14 @@ def determine_cuda_runtime_lib_path() -> Union[Path, None]:
     candidate_env_vars = get_potentially_lib_path_containing_env_vars()
 
     if "CONDA_PREFIX" in candidate_env_vars:
+        conda_libs_path = Path(candidate_env_vars["CONDA_PREFIX"]) / "bin"
+
+        conda_cuda_libs = find_cuda_lib_in(str(conda_libs_path))
+        warn_in_case_of_duplicates(conda_cuda_libs)
+
+        if conda_cuda_libs:
+            return next(iter(conda_cuda_libs))
+        
         conda_libs_path = Path(candidate_env_vars["CONDA_PREFIX"]) / "lib"
 
         conda_cuda_libs = find_cuda_lib_in(str(conda_libs_path))
@@ -95,21 +112,94 @@ def determine_cuda_runtime_lib_path() -> Union[Path, None]:
             f'{CUDA_RUNTIME_LIB} as expected! Searching further paths...'
         )
 
+    for sitedir in site.getsitepackages():
+        if "site-packages" in sitedir:
+                site_packages_path = sitedir
+                break
+    if site_packages_path:
+        torch_libs_path = os.path.join(site_packages_path, "torch", "lib")
+        
+        if os.path.isdir(torch_libs_path):
+            torch_cuda_libs = find_cuda_lib_in(str(torch_libs_path))
+            warn_in_case_of_duplicates(torch_cuda_libs)
+
+            if torch_cuda_libs:
+                return next(iter(torch_cuda_libs))
+
+        warn(
+            f'{candidate_env_vars["CONDA_PREFIX"]} did not contain '
+            f'{CUDA_RUNTIME_LIB} as expected! Searching further paths...'
+        )
+        
+    if "CUDA_PATH" in candidate_env_vars:
+        win_toolkit_libs_path = Path(candidate_env_vars["CUDA_PATH"]) / "bin"
+    
+        win_toolkit_cuda_libs = find_cuda_lib_in(str(win_toolkit_libs_path))
+        warn_in_case_of_duplicates(win_toolkit_cuda_libs)
+
+        if win_toolkit_cuda_libs:
+            return next(iter(win_toolkit_cuda_libs))
+
+        win_toolkit_libs_path = Path(candidate_env_vars["CUDA_PATH"]) / "lib"
+    
+        win_toolkit_cuda_libs = find_cuda_lib_in(str(win_toolkit_libs_path))
+        warn_in_case_of_duplicates(win_toolkit_cuda_libs)
+
+        if win_toolkit_cuda_libs:
+            return next(iter(win_toolkit_cuda_libs))
+
+        warn(
+            f'{candidate_env_vars["CONDA_PREFIX"]} did not contain '
+            f'{CUDA_RUNTIME_LIB} as expected! Searching further paths...'
+        )
+        
+    if "CUDA_HOME" in candidate_env_vars:
+        lin_toolkit_libs_path = Path(candidate_env_vars["CUDA_HOME"]) / "bin"
+    
+        lin_toolkit_cuda_libs = find_cuda_lib_in(str(lin_toolkit_libs_path))
+        warn_in_case_of_duplicates(lin_toolkit_cuda_libs)
+
+        if lin_toolkit_cuda_libs:
+            return next(iter(lin_toolkit_cuda_libs))
+        
+        lin_toolkit_libs_path = Path(candidate_env_vars["CUDA_HOME"]) / "lib"
+    
+        lin_toolkit_cuda_libs = find_cuda_lib_in(str(lin_toolkit_libs_path))
+        warn_in_case_of_duplicates(lin_toolkit_cuda_libs)
+
+        if lin_toolkit_cuda_libs:
+            return next(iter(lin_toolkit_cuda_libs))
+
+        warn(
+            f'{candidate_env_vars["CONDA_PREFIX"]} did not contain '
+            f'{CUDA_RUNTIME_LIB} as expected! Searching further paths...'
+        )
+
     if "LD_LIBRARY_PATH" in candidate_env_vars:
         lib_ld_cuda_libs = find_cuda_lib_in(candidate_env_vars["LD_LIBRARY_PATH"])
 
         if lib_ld_cuda_libs:
-            return next(iter(lib_ld_cuda_libs))
+            cuda_runtime_libs.update(lib_ld_cuda_libs)
         warn_in_case_of_duplicates(lib_ld_cuda_libs)
 
+        CUDASetup.get_instance().add_log_entry(f'{candidate_env_vars["LD_LIBRARY_PATH"]} did not contain '
+            f'{CUDA_RUNTIME_LIBS} as expected! Searching further paths...', is_warning=True)
+        
+    if "PATH" in candidate_env_vars:
+        lib_path_cuda_libs = find_cuda_lib_in(candidate_env_vars["PATH"])
+        warn_in_case_of_duplicates(lib_path_cuda_libs)
+
+        if lib_path_cuda_libs:
+            return next(iter(lib_path_cuda_libs))
+
         warn(
-            f'{candidate_env_vars["LD_LIBRARY_PATH"]} did not contain '
+            f'{candidate_env_vars["CONDA_PREFIX"]} did not contain '
             f'{CUDA_RUNTIME_LIB} as expected! Searching further paths...'
         )
-
+        
     remaining_candidate_env_vars = {
         env_var: value for env_var, value in candidate_env_vars.items()
-        if env_var not in {"CONDA_PREFIX", "LD_LIBRARY_PATH"}
+        if env_var not in {"CONDA_PREFIX", "CUDA_HOME", "CUDA_PATH", "LD_LIBRARY_PATH", "PATH"}
     }
 
     cuda_runtime_libs = set()
@@ -117,9 +207,7 @@ def determine_cuda_runtime_lib_path() -> Union[Path, None]:
         cuda_runtime_libs.update(find_cuda_lib_in(value))
 
     if len(cuda_runtime_libs) == 0:
-        print('CUDA_SETUP: WARNING! libcudart.so not found in any environmental path. Searching /usr/local/cuda/lib64...')
-        cuda_runtime_libs.update(find_cuda_lib_in('/usr/local/cuda/lib64'))
-
-    warn_in_case_of_duplicates(cuda_runtime_libs)
+        print(f'CUDA_SETUP: WARNING! {CUDA_RUNTIME_LIB} not found in any environmental path. Searching {backup_path}...')
+        cuda_runtime_libs.update(find_cuda_lib_in(backup_path))
 
     return next(iter(cuda_runtime_libs)) if cuda_runtime_libs else None

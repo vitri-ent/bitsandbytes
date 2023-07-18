@@ -25,10 +25,10 @@ class CUDALibrary_Singleton(object):
                 print('CUDA SETUP: CUDA detection failed. Either CUDA driver not installed, CUDA not installed, or you have multiple conflicting CUDA libraries!')
                 print('CUDA SETUP: If you compiled from source, try again with `make CUDA_VERSION=DETECTED_CUDA_VERSION` for example, `make CUDA_VERSION=113`.')
                 raise Exception('CUDA SETUP: Setup Failed!')
-            self.lib = ct.cdll.LoadLibrary(binary_path)
+            self.lib = ct.cdll.LoadLibrary(str(binary_path))
         else:
             print(f"CUDA SETUP: Loading binary {binary_path}...")
-            self.lib = ct.cdll.LoadLibrary(binary_path)
+            self.lib = ct.cdll.LoadLibrary(str(binary_path))
 
     @classmethod
     def get_instance(cls):

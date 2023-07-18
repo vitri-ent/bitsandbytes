@@ -17,9 +17,17 @@ evaluation:
 """
 
 import ctypes
+import platform
+import os
 
 from .paths import determine_cuda_runtime_lib_path
 
+
+IS_WINDOWS_PLATFORM: bool = (platform.system()=="Windows")
+PATH_COLLECTION_SEPARATOR: str = ":" if not IS_WINDOWS_PLATFORM else ";"
+CUDA_SHARED_LIB_NAME: str = "libcuda.so" if not IS_WINDOWS_PLATFORM else f"{os.environ['SystemRoot']}\\System32\\nvcuda.dll"
+SHARED_LIB_EXTENSION: str = ".so" if not IS_WINDOWS_PLATFORM else ".dll"
+CUDA_RUNTIME_LIB = "libcudart.so" if not IS_WINDOWS_PLATFORM else "cudart64_110.dll"
 
 def check_cuda_result(cuda, result_val):
     # 3. Check for CUDA errors
@@ -31,10 +39,10 @@ def check_cuda_result(cuda, result_val):
 def get_cuda_version(cuda, cudart_path):
     # https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART____VERSION.html#group__CUDART____VERSION
     try:
-        cudart = ctypes.CDLL(cudart_path)
+        cudart = ctypes.CDLL(str(cudart_path))
     except OSError:
         # TODO: shouldn't we error or at least warn here?
-        print(f'ERROR: libcudart.so could not be read from path: {cudart_path}!')
+        print(f'ERROR: libcudart{SHARED_LIB_EXTENSION} could not be read from path: {cudart_path}!')
         return None
 
     version = ctypes.c_int()
@@ -52,10 +60,10 @@ def get_cuda_version(cuda, cudart_path):
 def get_cuda_lib_handle():
     # 1. find libcuda.so library (GPU driver) (/usr/lib)
     try:
-        cuda = ctypes.CDLL("libcuda.so")
+        cuda = ctypes.CDLL(CUDA_SHARED_LIB_NAME)
     except OSError:
         # TODO: shouldn't we error or at least warn here?
-        print('CUDA SETUP: WARNING! libcuda.so not found! Do you have a CUDA driver installed? If you are on a cluster, make sure you are on a CUDA machine!')
+        print(f'CUDA SETUP: WARNING! {CUDA_SHARED_LIB_NAME} not found! Do you have a CUDA driver installed? If you are on a cluster, make sure you are on a CUDA machine!')
         return None
     check_cuda_result(cuda, cuda.cuInit(0))
 
@@ -112,10 +120,9 @@ def get_compute_capability(cuda):
 def evaluate_cuda_setup():
     print('')
     print('='*35 + 'BUG REPORT' + '='*35)
-    print('Welcome to bitsandbytes. For bug reports, please submit your error trace to: https://github.com/TimDettmers/bitsandbytes/issues')
-    print('For effortless bug reporting copy-paste your error into this form: https://docs.google.com/forms/d/e/1FAIpQLScPB8emS3Thkp66nvqwmjTEgxp8Y9ufuWTzFyr9kJ5AoI47dQ/viewform?usp=sf_link')
+    print('Welcome to bitsandbytes. For bug reports, please submit your error trace to: https://github.com/jllllll/bitsandbytes/issues')
     print('='*80)
-    binary_name = "libbitsandbytes_cpu.so"
+    binary_name = f"libbitsandbytes_cpu{SHARED_LIB_EXTENSION}"
     #if not torch.cuda.is_available():
         #print('No GPU detected. Loading CPU library...')
         #return binary_name
@@ -123,7 +130,7 @@ def evaluate_cuda_setup():
     cudart_path = determine_cuda_runtime_lib_path()
     if cudart_path is None:
         print(
-            "WARNING: No libcudart.so found! Install CUDA or the cudatoolkit package (anaconda)!"
+            f"WARNING: No {CUDA_RUNTIME_LIB} found! Install CUDA or the cudatoolkit package (anaconda)!"
         )
         return binary_name
 
@@ -141,7 +148,7 @@ def evaluate_cuda_setup():
         return binary_name
 
     # 7.5 is the minimum CC vor cublaslt
-    has_cublaslt = cc in ["7.5", "8.0", "8.6"]
+    has_cublaslt = cc in ["7.5", "8.0", "8.6", "8.9", "9.0"]
 
     # TODO:
     # (1) CUDA missing cases (no CUDA installed by CUDA driver (nvidia-smi accessible)
@@ -155,9 +162,9 @@ def evaluate_cuda_setup():
         "if not has_cublaslt (CC < 7.5), then we have to choose  _nocublaslt.so"
         bin_base_name = "libbitsandbytes_cuda"
         if has_cublaslt:
-            return f"{bin_base_name}{cuda_version_string}.so"
+            return f"{bin_base_name}{cuda_version_string}{SHARED_LIB_EXTENSION}"
         else:
-            return f"{bin_base_name}{cuda_version_string}_nocublaslt.so"
+            return f"{bin_base_name}{cuda_version_string}_nocublaslt{SHARED_LIB_EXTENSION}"
 
     binary_name = get_binary_name()
 

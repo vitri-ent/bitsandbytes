@@ -4,11 +4,15 @@ __pycache__/
 *$py.class
 
 # C extensions
-*.so
+bitsandbytes/*.so
+bitsandbytes/*.dll
+bitsandbytes/*.lib
+bitsandbytes/*.exp
 
 # Distribution / packaging
 .Python
 build/
+build_*/
 develop-eggs/
 dist/
 downloads/
