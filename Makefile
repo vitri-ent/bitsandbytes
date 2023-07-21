@@ -24,6 +24,7 @@ endif
 
 
 NVCC := $(CUDA_HOME)/bin/nvcc
+HIPCC := $(ROCM_HOME)/bin/hipcc
 
 ###########################################
 
@@ -57,7 +58,7 @@ CC_CUDA118 += -gencode arch=compute_86,code=sm_86
 CC_CUDA118 += -gencode arch=compute_89,code=sm_89
 CC_CUDA118 += -gencode arch=compute_90,code=[compute_90,sm_90]
 
-CC_ROCM := --offload-arch=gfx900 --offload-arch=gfx90agfx904 --offload-arch=gfx906 --offload-arch=gfx908 --offload-arch=gfx940 --offload-arch=gfx941 --offload-arch=gfx942 --offload-arch=gfx1010 --offload-arch=gfx1011 --offload-arch=gfx1012 --offload-arch=gfx1013 --offload-arch=gfx1030 --offload-arch=gfx1031 --offload-arch=gfx1032 --offload-arch=gfx1034
+CC_ROCM := --amdgpu-target=gfx900 --amdgpu-target=gfx90a --amdgpu-target=gfx904 --amdgpu-target=gfx906 --amdgpu-target=gfx908 --amdgpu-target=gfx940 --amdgpu-target=gfx941 --amdgpu-target=gfx942 --amdgpu-target=gfx1010 --amdgpu-target=gfx1011 --amdgpu-target=gfx1012 --amdgpu-target=gfx1013 --amdgpu-target=gfx1030 --amdgpu-target=gfx1031 --amdgpu-target=gfx1032 --amdgpu-target=gfx1034
 
 
 all: $(BUILD_DIR) env
