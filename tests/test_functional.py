@@ -130,6 +130,7 @@ def test_quantile_quantization():
         assert diff < 0.001
 
 
+
 def test_dynamic_quantization():
     diffs = []
     reldiffs = []
@@ -142,8 +143,8 @@ def test_dynamic_quantization():
         diffs.append(diff.mean().item())
         reldiffs.append(reldiff.mean().item())
         assert diff.mean().item() < 0.0135
-    # print(sum(diffs)/len(diffs))
-    # print(sum(reldiffs)/len(reldiffs))
+    print(sum(diffs)/len(diffs))
+    print(sum(reldiffs)/len(reldiffs))
 
     for i in range(100):
         A1 = torch.rand(1024, 1024, device=DEFAULT_DEVICE)
@@ -158,7 +159,8 @@ def test_dynamic_quantization():
 @pytest.mark.parametrize("dtype", [torch.float32, torch.float16, torch.bfloat16], ids=["fp32", "fp16", "bf16"])
 @pytest.mark.parametrize("nested", [False, True], ids=["False", "True"])
 @pytest.mark.parametrize("blocksize", [4096, 2048, 1024, 512, 256, 128, 64])
-def test_dynamic_blockwise_quantization(dtype, nested, blocksize):
+@pytest.mark.parametrize("signed", [True, False], ids=['signed_True', 'signed_False'])
+def test_dynamic_blockwise_quantization(dtype, nested, blocksize, signed):
     #print('')
     diffs = []
     reldiffs = []
@@ -179,9 +181,10 @@ def test_dynamic_blockwise_quantization(dtype, nested, blocksize):
     assert A2.dtype == dtype
 
     diffs = []
+    code = F.create_dynamic_map(signed=signed)
     for i in range(100):
         A1 = torch.rand(1024, 1024, device=DEFAULT_DEVICE, dtype=dtype)
-        C, S = F.quantize_blockwise(A1, blocksize=blocksize, nested=nested)
+        C, S = F.quantize_blockwise(A1, blocksize=blocksize, nested=nested, code=code)
         A2 = F.dequantize_blockwise(C, S)
         diff = torch.abs(A1 - A2).float()
         reldiff = diff / torch.abs(A1.float() + 1e-8)
@@ -190,11 +193,15 @@ def test_dynamic_blockwise_quantization(dtype, nested, blocksize):
         #torch.testing.assert_close(A1, A2, atol=1e-2, rtol=0)
     abserr = sum(diffs)/len(diffs)
     relerr = sum(reldiffs)/len(reldiffs)
-    assert abserr < 0.0035
-    assert relerr < 0.015
+    if signed:
+        assert abserr < 0.0035
+        assert relerr < 0.015
+    else:
+        assert abserr < 0.00175
+        assert relerr < 0.012
     assert A2.dtype == dtype
-    #print('nested=', nested, 'rand', blocksize, sum(diffs)/len(diffs))
-    #print('nested=', nested, 'rand', blocksize, sum(reldiffs)/len(reldiffs))
+    #print('signed=', signed, 'nested=', nested, 'rand', blocksize, sum(diffs)/len(diffs))
+    #print('signed=', signed, 'nested=', nested, 'rand', blocksize, sum(reldiffs)/len(reldiffs))
 
 
 
@@ -769,7 +776,7 @@ def test_igemmlt_half(dim1, dim2, dim3, dim4, dims):
         # torch.testing.assert_close(C1.view(-1, C1.shape[-1]), output, atol=0.025, rtol=0.05)
 
         # transpose
-        # B = torch.randint(-128, 127, size=(dim3, dim4), device='cuda').to(torch.int8)
+        # B = torch.randint(-128, 127, size=(dim3, dim4), device=DEFAULT_DEVICE).to(torch.int8)
         # C1 = torch.matmul(A.float(), B.float())
 
         # B2t, SBt = F.transform2(B, 'col_turing', transpose=True)
@@ -965,7 +972,7 @@ names = ["dim1_{}_dim4_{}_dims_{}_formatB_{}_has_bias_{}".format(*vals) for vals
 def test_dequant_mm(dim1, dim4, dims, formatB, has_bias):
     inner = torch.randint(1, 128, size=(1,)).item()
     bias = None
-    if has_bias: bias = torch.randn(dim4, device='cuda', dtype=torch.float16)
+    if has_bias: bias = torch.randn(dim4, device=DEFAULT_DEVICE, dtype=torch.float16)
     formatB = F.get_special_format_str()
     for i in range(1):
         A = torch.randn(dim1, inner, device=DEFAULT_DEVICE)
@@ -1575,7 +1582,7 @@ def test_spmm_coo_very_sparse(dim1, dim2, dtype, out_func):
         B = torch.randn(dim2, dim2 * 4, device=DEFAULT_DEVICE).half()
         torch.nn.init.xavier_uniform_(B)
         B, SB = F.vectorwise_quant(B, quant_type="linear")
-        # B = torch.randint(-127, 127, size=(dim2, dim2*4), device='cuda').to(torch.int8)
+        # B = torch.randint(-127, 127, size=(dim2, dim2*4), device=DEFAULT_DEVICE).to(torch.int8)
 
     print("")
     idx = torch.abs(A) >= threshold
@@ -1608,7 +1615,7 @@ def test_spmm_coo_very_sparse(dim1, dim2, dtype, out_func):
 
     # torch.testing.assert_close(out1, out2.half(), rtol=0.05, atol=0.001)
 
-    # Bt = torch.randn(dim2*4, dim2, device='cuda').half()
+    # Bt = torch.randn(dim2*4, dim2, device=DEFAULT_DEVICE).half()
     # torch.cuda.synchronize()
     # t0 = time.time()
     # print(A2.shape, B.shape)
@@ -2150,7 +2157,7 @@ def test_few_bit_quant():
             elif method == 'dynamic':
                 code = F.create_dynamic_map(True, bits-0, bits).cuda()
             elif method == 'quantile':
-                values = torch.randn(2048, 2048, device='cuda')
+                values = torch.randn(2048, 2048, device=DEFAULT_DEVICE)
                 code = F.create_quantile_map(values, bits).cuda()
             # for some data types we have no zero
             # for some data types we have one zero
@@ -2160,7 +2167,7 @@ def test_few_bit_quant():
             assert code.numel() == 256
             for i in range(10):
 
-                values = torch.randn(1, 32, device='cuda')
+                values = torch.randn(1, 32, device=DEFAULT_DEVICE)
                 values /= values.abs().max()
                 #values[values.abs() < 1e-6] += 1e-5
 
@@ -2194,7 +2201,7 @@ def test_few_bit_quant():
 
 def test_kbit_quantile_estimation():
     for i in range(100):
-        data = torch.randn(1024, 1024, device='cuda')
+        data = torch.randn(1024, 1024, device=DEFAULT_DEVICE)
         for bits in range(2, 9):
             p = np.linspace(1.3e-4, 1-1.3e-4, 2**bits)
             val1 = torch.Tensor(norm.ppf(p)).cuda()
@@ -2203,7 +2210,7 @@ def test_kbit_quantile_estimation():
             assert err < 0.038
 
     for i in range(100):
-        data = torch.randn(1024, 1024, device='cuda')
+        data = torch.randn(1024, 1024, device=DEFAULT_DEVICE)
         for bits in range(2, 4):
             total_values = 2**bits-1
             p = np.linspace(0, 1, 2*total_values+1)
@@ -2218,7 +2225,7 @@ def test_kbit_quantile_estimation():
 
 
 def test_bench_dequantization():
-    a = torch.rand(1024, 1024, device='cuda').half()
+    a = torch.rand(1024, 1024, device=DEFAULT_DEVICE).half()
     code =F.create_fp8_map(True, 3, 0, 4).cuda()
     qa, SA = F.quantize_blockwise(a, code=code)
     print(qa.max())
@@ -2258,7 +2265,7 @@ def test_fp4_quant(dtype):
             result = sign*exp*frac
         code[idx] = result
 
-    A1 = torch.randn(1024, 1024, device='cuda', dtype=dtype)
+    A1 = torch.randn(1024, 1024, device=DEFAULT_DEVICE, dtype=dtype)
     qa, SA = F.quantize_fp4(A1, blocksize=64)
     A2 = F.dequantize_fp4(qa, SA)
 
@@ -2279,7 +2286,7 @@ def test_4bit_compressed_stats(quant_type):
         errs1 = []
         errs2 = []
         for i in range(10):
-            A1 = torch.randn(1024, 1024, device='cuda').half()
+            A1 = torch.randn(1024, 1024, device=DEFAULT_DEVICE).half()
             q2, SA2 = F.quantize_4bit(A1, blocksize=blocksize, quant_type=quant_type)
             q3, SA3= F.quantize_4bit(A1, blocksize=blocksize, compress_statistics=True, quant_type=quant_type)
             A2 = F.dequantize_4bit(q2, SA2, quant_type=quant_type)
