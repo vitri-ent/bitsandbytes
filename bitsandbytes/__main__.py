@@ -66,12 +66,12 @@ def generate_bug_report_information():
             print(paths)
             print('')
     if isdir(os.environ.get('CUDA_HOME', False)):
-        paths = find_file_recursive(os.environ['CONDA_PREFIX'], f'*cuda*{SHARED_LIB_EXTENSION}')
+        paths = find_file_recursive(os.environ['CUDA_HOME'], f'*cuda*{SHARED_LIB_EXTENSION}')
         print_header("CUDA_HOME CUDA PATHS")
         print(paths)
         print('')
     elif isdir(os.environ.get('CUDA_PATH', False)):
-        paths = find_file_recursive(os.environ['CONDA_PREFIX'], f'*cuda*{SHARED_LIB_EXTENSION}')
+        paths = find_file_recursive(os.environ['CUDA_PATH'], f'*cuda*{SHARED_LIB_EXTENSION}')
         print_header("CUDA_PATH CUDA PATHS")
         print(paths)
         print('')
